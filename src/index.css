@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Default to dark theme */
+:root {
+  --color-bg-dark: #1a202c;
+  --color-bg-light: #2d3748;
+  --color-window-bg: #2d3748; /* Opaque background */
+  --color-header-bg: #1a202c;
+  --color-header-bg-active: #4a5568;
+  --color-text: #e2e8f0;
+  --color-text-muted: #a0aec0;
+  --color-border: #4a5568;
+  --color-border-light: #718096;
+}
+
+.light {
+  --color-bg-dark: #f7fafc;
+  --color-bg-light: #edf2f7;
+  --color-window-bg: #ffffff; /* Opaque background */
+  --color-header-bg: #e2e8f0;
+  --color-header-bg-active: #cbd5e0;
+  --color-text: #2d3748;
+  --color-text-muted: #718096;
+  --color-border: #cbd5e0;
+  --color-border-light: #a0aec0;
+}
+
+.blue {
+  --color-bg-dark: #1a365d;
+  --color-bg-light: #2a4365;
+  --color-window-bg: #1a365d; /* Opaque background */
+  --color-header-bg: #152c4d;
+  --color-header-bg-active: #2c5282;
+  --color-text: #e6fffa;
+  --color-text-muted: #b2f5ea;
+  --color-border: #2c5282;
+  --color-border-light: #4a5568;
+}
+
