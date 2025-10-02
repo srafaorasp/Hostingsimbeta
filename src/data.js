@@ -51,27 +51,20 @@ export const SCRIPT_PERMISSIONS = {
 };
 
 export const TASK_DEFINITIONS = [
-    // Unboxing tasks
     { id: 'unbox_rack', description: 'Unbox Server Rack', requiredSkill: 'Hardware Technician', requiredHardware: { 'rack_std_01': 1 }, durationMinutes: 30, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'rack_std_01' } },
     { id: 'unbox_server', description: 'Unbox Blade Server', requiredSkill: 'Hardware Technician', requiredHardware: { 'server_blade_g1': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'server_blade_g1' } },
     { id: 'unbox_switch', description: 'Unbox Network Switch', requiredSkill: 'Hardware Technician', requiredHardware: { 'switch_48p': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'switch_48p' } },
     { id: 'unbox_pdu', description: 'Unbox PDU', requiredSkill: 'Hardware Technician', requiredHardware: { 'pdu_basic_3kw': 1 }, durationMinutes: 10, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'pdu_basic_3kw' } },
     { id: 'unbox_crac', description: 'Unbox CRAC', requiredSkill: 'Hardware Technician', requiredHardware: { 'crac_10k_btu': 1 }, durationMinutes: 45, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'crac_10k_btu' } },
-    
-    // Installation tasks
     { id: 'install_rack', description: 'Install Server Rack', requiredSkill: 'Hardware Technician', durationMinutes: 120, location: 'Server Room', needsStaged: 'rack_std_01', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_pdu', description: 'Install PDU', requiredSkill: 'Hardware Technician', durationMinutes: 60, location: 'Server Room', needsStaged: 'pdu_basic_3kw', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_crac', description: 'Install CRAC Unit', requiredSkill: 'Hardware Technician', durationMinutes: 240, location: 'Server Room', needsStaged: 'crac_10k_btu', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
+    { id: 'connect_rack_power', description: 'Connect Rack to PDU', requiredSkill: 'Hardware Technician', durationMinutes: 20, location: 'Server Room', needsTarget: 'RACK_UNPOWERED', onCompleteEffect: { action: 'CONNECT_RACK_TO_PDU' } },
     { id: 'install_server', description: 'Install Blade Server', requiredSkill: 'Hardware Technician', durationMinutes: 60, location: 'Server Room', needsStaged: 'server_blade_g1', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_switch', description: 'Install Network Switch', requiredSkill: 'Hardware Technician', durationMinutes: 45, location: 'Server Room', needsStaged: 'switch_48p', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
-
-    // Connection and Configuration tasks
-    { id: 'connect_rack_power', description: 'Connect Rack to PDU', requiredSkill: 'Hardware Technician', durationMinutes: 20, location: 'Server Room', needsTarget: 'RACK_UNPOWERED', onCompleteEffect: { action: 'CONNECT_RACK_TO_PDU' } },
     { id: 'bring_server_online', description: 'Power On Hardware', requiredSkill: 'Hardware Technician', durationMinutes: 5, location: 'Server Room', needsTarget: 'SERVER_INSTALLED', onCompleteEffect: { action: 'BRING_ONLINE' } },
     { id: 'config_lan', description: 'Configure Internal Network (LAN)', requiredSkill: 'Network Engineer', durationMinutes: 30, location: 'Server Room', needsTarget: 'SERVER_ONLINE', onCompleteEffect: { action: 'CONFIGURE_LAN' }},
     { id: 'config_wan', description: 'Assign Public IP (WAN)', requiredSkill: 'Network Engineer', durationMinutes: 15, location: 'Server Room', needsTarget: 'SERVER_LAN_CONFIGURED', onCompleteEffect: { action: 'CONFIGURE_WAN' }},
-    
-    // Maintenance tasks
     { id: 'repair_hardware', description: 'Repair Failed Hardware', requiredSkill: 'Hardware Technician', durationMinutes: 180, location: 'Server Room', needsTarget: 'SERVER_FAILED', onCompleteEffect: { action: 'BRING_ONLINE' } },
 ];
 
@@ -90,7 +83,6 @@ export const APPS_CONFIG = {
     'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('/src/apps/PowerManager.jsx')) },
     'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('/src/apps/ScriptIDE.jsx')) },
     'DaemonManager': { title: 'Daemon Manager', icon: Icons.BotIcon, component: React.lazy(() => import('/src/apps/DaemonManager.jsx')) },
-    // This is the missing line that registers the new app with the game's OS.
     'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('/src/apps/ScriptingGuide.jsx')) },
 };
 
