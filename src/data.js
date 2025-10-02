@@ -90,6 +90,7 @@ export const APPS_CONFIG = {
     'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('/src/apps/PowerManager.jsx')) },
     'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('/src/apps/ScriptIDE.jsx')) },
     'DaemonManager': { title: 'Daemon Manager', icon: Icons.BotIcon, component: React.lazy(() => import('/src/apps/DaemonManager.jsx')) },
+    // This is the missing line that registers the new app with the game's OS.
     'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('/src/apps/ScriptingGuide.jsx')) },
 };
 
