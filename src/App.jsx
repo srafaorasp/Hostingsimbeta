@@ -66,18 +66,23 @@ export default function App() {
     };
     
     if (!isLoggedIn) return <LoginScreen onLogin={handleLogin} />;
-
+    
     const desktopApps = Object.keys(APPS_CONFIG);
 
     return (
         <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
-            <div className="absolute top-4 left-4 flex items-center gap-3 bg-black/30 backdrop-blur-sm p-2 rounded-lg">
+            <div className="absolute top-4 left-4 flex items-center gap-3 bg-black/30 backdrop-blur-sm p-2 rounded-lg z-10">
                 <Logo />
                 <h1 className="text-2xl font-bold text-white tracking-wider">DataCenter OS</h1>
             </div>
 
-            <div className="p-4 pt-24 grid grid-cols-1 gap-4 w-28">
-                {desktopApps.map(appId => <DesktopIcon key={appId} appId={appId} onIconClick={openApp} appsConfig={APPS_CONFIG} />)}
+            {/* This is the new, responsive container for all desktop icons */}
+            <div className="absolute top-0 left-0 right-0 bottom-12 pt-24 p-4 flex flex-col flex-wrap content-start gap-x-2 gap-y-4">
+                {desktopApps.map(appId => (
+                    <div key={appId} className="w-28">
+                         <DesktopIcon appId={appId} onIconClick={openApp} appsConfig={APPS_CONFIG} />
+                    </div>
+                ))}
             </div>
             
             <Suspense fallback={<div className="text-white">Loading...</div>}>
