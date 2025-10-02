@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useGameStore from '/src/store/gameStore.js';
+// This import path has been corrected to point to the correct data source.
 import { TASK_DEFINITIONS, PRIORITIES, PRIORITY_COLORS } from '/src/data.js';
 
 const TaskCreator = ({ taskDef }) => {

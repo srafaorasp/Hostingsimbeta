@@ -14,7 +14,8 @@ function WifiIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24"
 function BatteryIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#27ae60" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="18" height="12" rx="2" ry="2"></rect><line x1="23" y1="13" x2="23" y2="11"></line></svg>)}
 function CodeIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8e44ad" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>)}
 function BotIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d35400" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>)}
+function BookIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20v2H6.5A2.5 2.5 0 0 1 4 17V6.5A2.5 2.5 0 0 1 6.5 4H20v13.5H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>)}
 
-const Icons = { FolderIcon, CameraIcon, TerminalIcon, UsersIcon, CalendarIcon, LayoutIcon, PowerIcon, GlobeIcon, AlertIcon, SettingsIcon, WifiIcon, BatteryIcon, CodeIcon, BotIcon };
+const Icons = { FolderIcon, CameraIcon, TerminalIcon, UsersIcon, CalendarIcon, LayoutIcon, PowerIcon, GlobeIcon, AlertIcon, SettingsIcon, WifiIcon, BatteryIcon, CodeIcon, BotIcon, BookIcon };
 export default Icons;
 
