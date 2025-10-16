@@ -1,16 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import useGameStore from '/src/store/gameStore.js';
+import { TASK_DEFINITIONS } from '/src/data.js';
 
 const DaemonManager = () => {
     const deployDaemon = useGameStore(state => state.deployDaemon);
     const removeDaemon = useGameStore(state => state.removeDaemon);
     const daemons = useGameStore(state => state.state.scripting.daemons);
     const agents = useGameStore(state => state.state.scripting.agents);
+    const employees = useGameStore(state => state.state.employees);
     const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
 
     const [selectedServerId, setSelectedServerId] = useState('');
     const [selectedAgent, setSelectedAgent] = useState('');
-    const [rules, setRules] = useState([{ metric: 'powerDraw', condition: '>', value: 400, action: 'alert', target: 'player.ui', command: 'showAlert', args: ['Power Alert', 'Server power draw is critical!'] }]);
+    const [rules, setRules] = useState([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'showAlert', args: 'Power Alert,Server power draw is critical!' }]);
 
     const availableServers = useMemo(() => {
         const servers = [];
@@ -28,29 +30,44 @@ const DaemonManager = () => {
 
     const handleDeploy = () => {
         if (!selectedServerId || !selectedAgent) return;
-        const config = { agent: selectedAgent, rules };
+        const processedRules = rules.map(r => ({
+            ...r,
+            args: r.args.split(',').map(arg => arg.trim()) // Convert comma-separated string to array
+        }));
+        const config = { agent: selectedAgent, rules: processedRules };
         deployDaemon(selectedServerId, config);
         setSelectedServerId('');
         setSelectedAgent('');
-        setRules([{ metric: 'powerDraw', condition: '>', value: 400, action: 'alert', target: 'player.ui', command: 'showAlert', args: ['Power Alert', 'Server power draw is critical!'] }]);
+        setRules([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'showAlert', args: 'Power Alert,Server power draw is critical!' }]);
     };
     
     const handleRuleChange = (index, field, value) => {
         const newRules = [...rules];
-        const rule = newRules[index];
+        const rule = { ...newRules[index] }; // Create a copy
         rule[field] = value;
+        
+        // Auto-fill common actions
         if (field === 'action') {
             if (value === 'alert') {
-                rule.target = 'player.ui';
-                rule.command = 'showAlert';
-                rule.args = ['Server Alert!', 'Metric out of bounds'];
+                rule.target = 'player'; rule.command = 'showAlert'; rule.args = 'Alert!,Metric is out of bounds';
             } else if (value === 'log') {
-                rule.target = 'system.log';
-                rule.command = 'log';
-                rule.args = ['Server metric out of bounds'];
+                rule.target = 'system'; rule.command = 'log'; rule.args = 'Daemon alert: metric out of bounds';
+            } else if (value === 'task') {
+                rule.target = employees.length > 0 ? employees[0].id : ''; 
+                rule.command = 'assignTask'; 
+                rule.args = 'repair_hardware,' + (selectedServerId || 'self');
             }
         }
+        newRules[index] = rule;
         setRules(newRules);
+    };
+
+    const addRule = () => {
+        setRules([...rules, { metric: '', condition: '>', value: '', action: 'log', target: 'system', command: 'log', args: 'New rule triggered' }]);
+    };
+
+    const removeRule = (index) => {
+        setRules(rules.filter((_, i) => i !== index));
     };
 
     return (
@@ -59,7 +76,7 @@ const DaemonManager = () => {
             <div className="grid grid-cols-2 gap-4 flex-grow min-h-0">
                 <div className="bg-gray-900 p-3 rounded-md flex flex-col">
                     <h3 className="font-bold text-lg mb-2">Deploy New Monitoring Daemon</h3>
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-grow overflow-y-auto pr-2">
                         <div>
                             <label className="text-sm">Target Server:</label>
                             <select value={selectedServerId} onChange={e => setSelectedServerId(e.target.value)} className="w-full p-1 bg-gray-700 rounded mt-1">
@@ -76,29 +93,37 @@ const DaemonManager = () => {
                         </div>
                         <div>
                             <label className="text-sm">Rules:</label>
-                            <div className="p-2 border border-gray-700 rounded mt-1 text-sm">
+                            <div className="p-2 border border-gray-700 rounded mt-1 space-y-2 text-xs">
                                 {rules.map((rule, index) => (
-                                    <div key={index} className="flex gap-2 items-center">
-                                        <span>IF</span>
-                                        <input value={rule.metric} onChange={e => handleRuleChange(index, 'metric', e.target.value)} placeholder="metric" className="w-24 bg-gray-700 p-1 rounded" />
-                                        <select value={rule.condition} onChange={e => handleRuleChange(index, 'condition', e.target.value)} className="bg-gray-700 p-1 rounded">
-                                            <option value=">">&gt;</option>
-                                            <option value="<">&lt;</option>
-                                            <option value="==">==</option>
-                                            <option value="!=">!=</option>
-                                        </select>
-                                        <input value={rule.value} onChange={e => handleRuleChange(index, 'value', e.target.value)} placeholder="value" className="w-16 bg-gray-700 p-1 rounded" />
-                                        <span>THEN</span>
-                                        <select value={rule.action} onChange={e => handleRuleChange(index, 'action', e.target.value)} className="bg-gray-700 p-1 rounded">
-                                            <option value="alert">Alert Player</option>
-                                            <option value="log">Log to System</option>
-                                        </select>
+                                    <div key={index} className="bg-gray-800 p-2 rounded space-y-1">
+                                        <div className="flex gap-2 items-center">
+                                            <span>IF metric</span>
+                                            <input value={rule.metric} onChange={e => handleRuleChange(index, 'metric', e.target.value)} placeholder="e.g., powerDraw" className="flex-grow bg-gray-700 p-1 rounded" />
+                                            <select value={rule.condition} onChange={e => handleRuleChange(index, 'condition', e.target.value)} className="bg-gray-700 p-1 rounded">
+                                                <option value=">">&gt;</option><option value="<">&lt;</option><option value="==">==</option><option value="!=">!=</option>
+                                            </select>
+                                            <input value={rule.value} onChange={e => handleRuleChange(index, 'value', e.target.value)} placeholder="value" className="w-16 bg-gray-700 p-1 rounded" />
+                                        </div>
+                                         <div className="flex gap-2 items-center">
+                                            <span>THEN</span>
+                                            <select value={rule.action} onChange={e => handleRuleChange(index, 'action', e.target.value)} className="bg-gray-700 p-1 rounded">
+                                                <option value="alert">Alert Player</option><option value="log">Log to System</option><option value="task">Assign Task</option>
+                                            </select>
+                                            <input value={rule.target} onChange={e => handleRuleChange(index, 'target', e.target.value)} placeholder="target" className="flex-grow bg-gray-700 p-1 rounded" title="Target ID (e.g. 'system', 'player', employee ID, device ID)" />
+                                            <input value={rule.command} onChange={e => handleRuleChange(index, 'command', e.target.value)} placeholder="command" className="flex-grow bg-gray-700 p-1 rounded" title="Command (e.g. 'log', 'showAlert')" />
+                                        </div>
+                                        <div className="flex gap-2 items-center">
+                                            <span>ARGS</span>
+                                            <input value={rule.args} onChange={e => handleRuleChange(index, 'args', e.target.value)} placeholder="comma, separated, args" className="flex-grow bg-gray-700 p-1 rounded" title="Comma-separated arguments" />
+                                            <button onClick={() => removeRule(index)} className="text-red-500 hover:text-red-400 font-bold">X</button>
+                                        </div>
                                     </div>
                                 ))}
+                                <button onClick={addRule} className="text-sm text-blue-400 hover:underline mt-2">+ Add Rule</button>
                             </div>
                         </div>
                     </div>
-                    <button onClick={handleDeploy} disabled={!selectedServerId || !selectedAgent} className="mt-auto bg-blue-600 px-4 py-2 rounded-md font-semibold hover:bg-blue-500 disabled:bg-gray-500">Deploy Daemon</button>
+                    <button onClick={handleDeploy} disabled={!selectedServerId || !selectedAgent} className="mt-2 bg-blue-600 px-4 py-2 rounded-md font-semibold hover:bg-blue-500 disabled:bg-gray-500">Deploy Daemon</button>
                 </div>
                 <div className="bg-gray-900 p-3 rounded-md overflow-y-auto">
                     <h3 className="font-bold text-lg mb-2">Active Daemons</h3>

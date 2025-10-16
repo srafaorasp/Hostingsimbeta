@@ -1,89 +1,127 @@
 import React from 'react';
 
-const CodeBlock = ({ children }) => (
-    <pre className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm my-2 overflow-x-auto">
-        <code>{children}</code>
-    </pre>
-);
-
-const Section = ({ title, children }) => (
-    <div className="mb-6">
-        <h2 className="text-2xl font-bold text-blue-400 border-b-2 border-blue-400/50 pb-1 mb-3">{title}</h2>
-        <div className="space-y-2 text-gray-300">
-            {children}
-        </div>
-    </div>
-);
+const CodeBlock = ({ children }) => <pre className="bg-gray-900 p-2 rounded-md text-green-400 font-mono text-xs my-2 whitespace-pre-wrap">{children.trim()}</pre>;
+const InlineCode = ({ children }) => <code className="bg-gray-700 px-1 rounded text-yellow-400 font-mono">{children}</code>;
 
 const ScriptingGuide = () => {
     return (
-        <div className="p-6 bg-gray-800 text-gray-200 h-full overflow-y-auto">
-            <h1 className="text-4xl font-bold mb-6">DataCenter OS: Scripting Guide</h1>
+        <div className="p-4 bg-gray-800 text-gray-300 h-full overflow-y-auto">
+            <h1 className="text-2xl font-bold text-white mb-4">Automation & Scripting Guide</h1>
 
-            <Section title="1. Introduction to Automation">
-                <p>Welcome to the Scripting Engine! This system allows you to automate repetitive tasks in your data center, create custom monitoring alerts, and interact with your hardware programmatically.</p>
-                <p>By writing simple scripts in the <strong>ScriptIDE</strong> app, you can save time and manage your growing infrastructure with greater efficiency.</p>
-            </Section>
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">1. Core Concepts</h2>
+            <p>The scripting system allows you to automate tasks through persistent, looping scripts. It's built on a few key ideas:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+                <li><strong>Agents:</strong> An Agent is a user account for your scripts. Every script runs as an Agent, which determines what permissions the script has.</li>
+                <li><strong>Scripts:</strong> A Script is a named block of commands. By default, scripts run on a loop at an interval you define.</li>
+                <li><strong>Commands:</strong> Each line in a script is a simple command that targets an endpoint (like a server or the system) and tells it to do something.</li>
+            </ul>
 
-            <Section title="2. The Basics: Agents & Permissions">
-                <p>Before you can run a script, you need a <strong>Script Agent</strong>. Think of an agent as a user account for your scripts. Each agent has a name and a specific set of permissions that define what it's allowed to do.</p>
-                <p>To create an agent:</p>
-                <ol className="list-decimal list-inside ml-4 space-y-1">
-                    <li>Open the <strong>ScriptIDE</strong> app.</li>
-                    <li>In the "Script Agents" panel, type a name for your new agent.</li>
-                    <li>Click the "+" button to create it.</li>
-                    <li>Select your new agent from the list to manage its permissions.</li>
-                </ol>
-                <p>Permissions are granular. For an agent to read a server's status, it needs the `read:server` permission. To shut that server down, it would need `write:server`.</p>
-            </Section>
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">2. The ScriptIDE App</h2>
+            <p>The <InlineCode>ScriptIDE</InlineCode> is your central hub for all automation. It allows you to:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+                <li>Create and delete Agents and manage their permissions.</li>
+                <li>Create, name, and delete Scripts assigned to an Agent.</li>
+                <li>Write multi-line scripts in the editor.</li>
+                <li>Control each script's execution (Run/Pause) and set its loop interval in seconds.</li>
+            </ul>
 
-            <Section title="3. The 'call()' Command">
-                <p>The core of the scripting engine is a single function: `call()`.</p>
-                <CodeBlock>call(target, command, ...args)</CodeBlock>
-                <ul className="list-disc list-inside ml-4">
-                    <li><strong>target (string):</strong> The unique ID or hostname of the device you want to interact with (e.g., a server's ID, 'player.ui').</li>
-                    <li><strong>command (string):</strong> The action you want to perform, formatted as 'action:key' (e.g., 'get:status', 'set:power').</li>
-                    <li><strong>...args (optional):</strong> Any additional arguments the command requires (e.g., the message for a notification).</li>
-                </ul>
-            </Section>
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">3. Execution Control</h2>
+            <h3 className="text-lg font-semibold text-white mt-4">Looping (Default)</h3>
+            <p>By default, any script set to "Run" will execute its entire block of commands every time its interval elapses.</p>
+            
+            <h3 className="text-lg font-semibold text-white mt-4">Run Once</h3>
+            <p>To make a script run only one time and then stop, add <InlineCode>RunOnce</InlineCode> as the very first line. This is useful for setup tasks.</p>
+            <CodeBlock>{`RunOnce
+player notify "Setup" "Initial configuration complete."`}</CodeBlock>
 
-            <Section title="4. API Reference">
-                <h3 className="text-xl font-semibold text-gray-100 mt-4 mb-2">Player UI (`player.ui`)</h3>
-                <p>Used to show information to the player.</p>
-                <CodeBlock>{`// Show a temporary toast notification
-call('player.ui', 'showToast', 'Backup Complete', 'Nightly backup script finished successfully.');
+            <h3 className="text-lg font-semibold text-white mt-4">Ending a Script Early</h3>
+            <p>You can stop the current execution of a script block using the <InlineCode>end</InlineCode> command. This is useful for conditional logic.</p>
+            <CodeBlock>{`# This script will log the status but never send the alert.
+server-01 get:status
+end
+player alert "CRITICAL" "This will not run."`}</CodeBlock>
 
-// Show a critical alert that requires acknowledgment
-call('player.ui', 'showAlert', 'OVERHEATING', 'Server SRV-01 temperature is critical!');`}</CodeBlock>
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">4. Command Syntax</h2>
+            <p>Every command follows the same structure: <InlineCode>{`<endpoint> <command> <...args> <destination>`}</InlineCode></p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+                <li><InlineCode>endpoint</InlineCode>: The ID or hostname of the device/system to target.</li>
+                <li><InlineCode>command</InlineCode>: The action to perform (e.g., <InlineCode>get:status</InlineCode>).</li>
+                <li><InlineCode>...args</InlineCode>: Optional arguments. Use quotes for arguments with spaces.</li>
+                <li><InlineCode>destination</InlineCode>: Optional. Where to send output: <InlineCode>log</InlineCode> (default), <InlineCode>toast</InlineCode>, or <InlineCode>alert</InlineCode>.</li>
+            </ul>
+             <p className="mt-2 text-sm text-gray-400">Note: All command outputs are automatically sent to the main <InlineCode>SysLog</InlineCode> for auditing, regardless of their destination.</p>
+            
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">5. Calling Other Scripts</h2>
+            <p>The <InlineCode>call {'<target>'}</InlineCode> command lets you trigger other scripts or agents on demand. This is a one-time execution.</p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+                <li>If the target is a script name, it runs that script.</li>
+                <li>If the target is an agent name, it runs ALL scripts owned by that agent (if the agent is marked "callable").</li>
+            </ul>
+            <CodeBlock>{`# This script, when run, will trigger a different script
+call MyOtherScript`}</CodeBlock>
+            <p className="text-sm text-gray-400">To prevent infinite loops, a script cannot call another script that is already in the current chain of calls.</p>
+            
+            <h2 className="text-xl font-semibold text-white mt-6 border-b border-gray-600 pb-1 mb-2">6. Command Reference</h2>
 
-                <h3 className="text-xl font-semibold text-gray-100 mt-4 mb-2">System Log (`system.log`)</h3>
-                <p>Used to write messages to the system log for debugging.</p>
-                <CodeBlock>{`// Log an informational message
-call('system.log', 'log', 'Starting maintenance script...');`}</CodeBlock>
+            {/* --- System Endpoint --- */}
+            <h3 className="text-lg font-semibold text-white mt-4">Endpoint: <InlineCode>system</InlineCode></h3>
+            <div className="border-l-2 border-gray-600 pl-4 mt-2 space-y-3">
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>list {'<type>'}</InlineCode></p>
+                    <p className="text-sm">Lists all available items of a specific type. Valid types are: <InlineCode>devices</InlineCode>, <InlineCode>servers</InlineCode>, <InlineCode>switches</InlineCode>, <InlineCode>routers</InlineCode>, <InlineCode>power</InlineCode>, <InlineCode>cooling</InlineCode>, <InlineCode>employees</InlineCode>, <InlineCode>tasks</InlineCode>.</p>
+                    <CodeBlock>system list servers toast</CodeBlock>
+                </div>
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>help</InlineCode></p>
+                    <p className="text-sm">Provides general help information.</p>
+                    <CodeBlock>system help</CodeBlock>
+                </div>
+            </div>
 
-                <h3 className="text-xl font-semibold text-gray-100 mt-4 mb-2">Servers (e.g., 'server_blade_g1_167...)</h3>
-                <p>Interact with individual servers. The target must be the server's unique ID.</p>
-                <CodeBlock>{`// Get the current status of a server
-const status = call('server_id_here', 'get:status');
-log('Server status: ' + status);
+            {/* --- Device Endpoints --- */}
+            <h3 className="text-lg font-semibold text-white mt-4">Endpoint: Device (<InlineCode>{'<hostname>'}</InlineCode> or <InlineCode>{'<id>'}</InlineCode>)</h3>
+            <div className="border-l-2 border-gray-600 pl-4 mt-2 space-y-3">
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>get:metrics</InlineCode></p>
+                    <p className="text-sm">Returns a JSON object of the device's current operational data (status, power draw, etc.).</p>
+                    <CodeBlock>web-server-01 get:metrics alert</CodeBlock>
+                </div>
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>get:status</InlineCode></p>
+                    <p className="text-sm">Returns a simple string of the device's current status (e.g., "ONLINE", "OFFLINE_POWER").</p>
+                    <CodeBlock>switch-01 get:status</CodeBlock>
+                </div>
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>set:power {'<on|off>'}</InlineCode></p>
+                    <p className="text-sm">Creates a task to change the power state of a device.</p>
+                    <CodeBlock>web-server-01 set:power off</CodeBlock>
+                </div>
+            </div>
+            
+            {/* --- Employee Endpoints --- */}
+            <h3 className="text-lg font-semibold text-white mt-4">Endpoint: Employee (<InlineCode>{'"<name>"'}</InlineCode> or <InlineCode>{'<id>'}</InlineCode>)</h3>
+             <div className="border-l-2 border-gray-600 pl-4 mt-2 space-y-3">
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>assign:task {'<task_id>'} {'<target_id>'}</InlineCode></p>
+                    <p className="text-sm">Assigns a specific task to an idle employee. The target ID is the device the task should be performed on.</p>
+                    <CodeBlock>"Alex Chen" assign:task repair_hardware web-server-01</CodeBlock>
+                </div>
+            </div>
 
-// Get the current power draw of a server
-const power = call('server_id_here', 'get:powerDraw');
-log('Power draw: ' + power + 'W');`}</CodeBlock>
-            </Section>
-
-             <Section title="5. Practical Examples">
-                <p>Here are a few simple scripts you can copy and paste into the ScriptIDE to get started.</p>
-                <h3 className="text-lg font-semibold text-gray-100 mt-2 mb-1">Example 1: Hello World</h3>
-                <p>This script sends a simple notification to the player. Requires `write:player:notify` permission.</p>
-                <CodeBlock>{`// This is a comment. The code starts on the next line.
-call('player.ui', 'showToast', 'Hello from ScriptIDE!', 'Your first script ran successfully.');`}</CodeBlock>
-
-                <h3 className="text-lg font-semibold text-gray-100 mt-2 mb-1">Example 2: System Logger</h3>
-                 <p>This script writes a custom message to the system log. Requires `write:system:log` permission.</p>
-                <CodeBlock>{`const timestamp = new Date().toLocaleTimeString();
-call('system.log', 'log', 'Script executed at ' + timestamp);`}</CodeBlock>
-            </Section>
+            {/* --- Player UI Endpoints --- */}
+            <h3 className="text-lg font-semibold text-white mt-4">Endpoint: <InlineCode>player</InlineCode></h3>
+             <div className="border-l-2 border-gray-600 pl-4 mt-2 space-y-3">
+                <div>
+                    <p className="font-semibold">Command: <InlineCode>notify "{'Title'}" "{'Message'}"</InlineCode></p>
+                    <p className="text-sm">Displays a temporary, non-critical toast notification.</p>
+                    <CodeBlock>player notify "Automation" "Script finished successfully."</CodeBlock>
+                </div>
+                 <div>
+                    <p className="font-semibold">Command: <InlineCode>alert "{'Title'}" "{'Message'}"</InlineCode></p>
+                    <p className="text-sm">Displays a critical, modal alert that the player must acknowledge.</p>
+                    <CodeBlock>player alert "OVERHEAT WARNING" "Server-03 has exceeded thermal limits."</CodeBlock>
+                </div>
+            </div>
 
         </div>
     );

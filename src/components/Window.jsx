@@ -72,7 +72,9 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
 
     return (
         <div
-            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden transition-all duration-100 ease-out text-gray-200 ${isActive ? 'shadow-blue-500/50' : 'shadow-black/50'} ${windowClasses}`}
+            // --- THIS IS THE FIX for window flashing ---
+            // Removed the 'transition-all' class to prevent flashing on re-render.
+            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden duration-100 ease-out text-gray-200 ${isActive ? 'shadow-blue-500/50' : 'shadow-black/50'} ${windowClasses}`}
             style={{
                 top: isMaximized ? 0 : position.y,
                 left: isMaximized ? 0 : position.x,
@@ -106,4 +108,3 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
 };
 
 export default Window;
-

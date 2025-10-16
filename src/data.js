@@ -1,6 +1,3 @@
-import React from 'react';
-import Icons from '/src/components/Icons.jsx';
-
 export const PRIORITIES = { Emergency: 4, High: 3, Normal: 2, Low: 1 };
 export const PRIORITY_COLORS = { Emergency: 'bg-red-600', High: 'bg-orange-500', Normal: 'bg-yellow-500', Low: 'bg-green-600' };
 
@@ -37,52 +34,46 @@ export const ISP_CONTRACTS = [
 ];
 
 export const SCRIPT_PERMISSIONS = {
+    'read:system': 'Read system-wide information (e.g., list of devices)',
     'read:server': 'Read server status and metrics',
     'write:server': 'Change server power state (reboot, shutdown)',
     'read:network': 'Read switch/router status and bandwidth',
+    'write:network': 'Change network device power state',
     'read:power': 'Read PDU, generator, and battery status',
     'write:power': 'Change generator/battery power state',
     'read:cooling': 'Read CRAC status and temperature',
     'write:cooling': 'Change CRAC power state',
-    'write:employee': 'Assign tasks to employees',
-    'write:player:notify': 'Send toast notifications to the player',
-    'write:player:alert': 'Send critical alerts to the player',
+    'write:employee:assign': 'Assign tasks to employees',
+    'write:player:notify': 'Send notifications and alerts to the player',
     'write:system:log': 'Write messages to the system log',
 };
 
 export const TASK_DEFINITIONS = [
+    // Unboxing tasks
     { id: 'unbox_rack', description: 'Unbox Server Rack', requiredSkill: 'Hardware Technician', requiredHardware: { 'rack_std_01': 1 }, durationMinutes: 30, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'rack_std_01' } },
     { id: 'unbox_server', description: 'Unbox Blade Server', requiredSkill: 'Hardware Technician', requiredHardware: { 'server_blade_g1': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'server_blade_g1' } },
     { id: 'unbox_switch', description: 'Unbox Network Switch', requiredSkill: 'Hardware Technician', requiredHardware: { 'switch_48p': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'switch_48p' } },
     { id: 'unbox_pdu', description: 'Unbox PDU', requiredSkill: 'Hardware Technician', requiredHardware: { 'pdu_basic_3kw': 1 }, durationMinutes: 10, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'pdu_basic_3kw' } },
     { id: 'unbox_crac', description: 'Unbox CRAC', requiredSkill: 'Hardware Technician', requiredHardware: { 'crac_10k_btu': 1 }, durationMinutes: 45, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'crac_10k_btu' } },
+    { id: 'unbox_router', description: 'Unbox Enterprise Router', requiredSkill: 'Hardware Technician', requiredHardware: { 'router_enterprise_01': 1 }, durationMinutes: 20, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'router_enterprise_01' } },
+    { id: 'unbox_fiber_terminal', description: 'Unbox Fiber Terminal', requiredSkill: 'Hardware Technician', requiredHardware: { 'fiber_terminal_sfp': 1 }, durationMinutes: 10, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'fiber_terminal_sfp' } },
+    { id: 'unbox_generator', description: 'Unbox Diesel Generator', requiredSkill: 'Hardware Technician', requiredHardware: { 'generator_diesel_50kw': 1 }, durationMinutes: 60, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'generator_diesel_50kw' } },
+
+    // Installation tasks
     { id: 'install_rack', description: 'Install Server Rack', requiredSkill: 'Hardware Technician', durationMinutes: 120, location: 'Server Room', needsStaged: 'rack_std_01', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_pdu', description: 'Install PDU', requiredSkill: 'Hardware Technician', durationMinutes: 60, location: 'Server Room', needsStaged: 'pdu_basic_3kw', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_crac', description: 'Install CRAC Unit', requiredSkill: 'Hardware Technician', durationMinutes: 240, location: 'Server Room', needsStaged: 'crac_10k_btu', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
-    { id: 'connect_rack_power', description: 'Connect Rack to PDU', requiredSkill: 'Hardware Technician', durationMinutes: 20, location: 'Server Room', needsTarget: 'RACK_UNPOWERED', onCompleteEffect: { action: 'CONNECT_RACK_TO_PDU' } },
     { id: 'install_server', description: 'Install Blade Server', requiredSkill: 'Hardware Technician', durationMinutes: 60, location: 'Server Room', needsStaged: 'server_blade_g1', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_switch', description: 'Install Network Switch', requiredSkill: 'Hardware Technician', durationMinutes: 45, location: 'Server Room', needsStaged: 'switch_48p', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
+    { id: 'install_router', description: 'Install Enterprise Router', requiredSkill: 'Network Engineer', durationMinutes: 60, location: 'Server Room', needsStaged: 'router_enterprise_01', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
+    { id: 'install_fiber_terminal', description: 'Install Fiber Terminal', requiredSkill: 'Network Engineer', durationMinutes: 30, location: 'Server Room', needsStaged: 'fiber_terminal_sfp', needsTarget: 'RACK_POWERED', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
+    { id: 'install_generator', description: 'Install Diesel Generator', requiredSkill: 'Hardware Technician', durationMinutes: 480, location: 'Facility', needsStaged: 'generator_diesel_50kw', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
+
+    // Configuration and maintenance tasks
+    { id: 'connect_rack_power', description: 'Connect Rack to PDU', requiredSkill: 'Hardware Technician', durationMinutes: 20, location: 'Server Room', needsTarget: 'RACK_UNPOWERED', onCompleteEffect: { action: 'CONNECT_RACK_TO_PDU' } },
     { id: 'bring_server_online', description: 'Power On Hardware', requiredSkill: 'Hardware Technician', durationMinutes: 5, location: 'Server Room', needsTarget: 'SERVER_INSTALLED', onCompleteEffect: { action: 'BRING_ONLINE' } },
     { id: 'config_lan', description: 'Configure Internal Network (LAN)', requiredSkill: 'Network Engineer', durationMinutes: 30, location: 'Server Room', needsTarget: 'SERVER_ONLINE', onCompleteEffect: { action: 'CONFIGURE_LAN' }},
     { id: 'config_wan', description: 'Assign Public IP (WAN)', requiredSkill: 'Network Engineer', durationMinutes: 15, location: 'Server Room', needsTarget: 'SERVER_LAN_CONFIGURED', onCompleteEffect: { action: 'CONFIGURE_WAN' }},
     { id: 'repair_hardware', description: 'Repair Failed Hardware', requiredSkill: 'Hardware Technician', durationMinutes: 180, location: 'Server Room', needsTarget: 'SERVER_FAILED', onCompleteEffect: { action: 'BRING_ONLINE' } },
 ];
-
-export const APPS_CONFIG = {
-    'OrderUp': { title: 'OrderUp', icon: Icons.FolderIcon, component: React.lazy(() => import('/src/apps/OrderUp.jsx')) },
-    'TaskRunner': { title: 'TaskRunner', icon: Icons.CalendarIcon, component: React.lazy(() => import('/src/apps/TaskRunner.jsx')) },
-    'TeamView': { title: 'TeamView', icon: Icons.UsersIcon, component: React.lazy(() => import('/src/apps/TeamView.jsx')) },
-    'NetAdmin': { title: 'NetAdmin', icon: Icons.TerminalIcon, component: React.lazy(() => import('/src/apps/NetAdmin.jsx')) },
-    'LayoutView': { title: 'LayoutView', icon: Icons.LayoutIcon, component: React.lazy(() => import('/src/apps/LayoutView.jsx')) },
-    'SiteView': { title: 'SiteView', icon: Icons.CameraIcon, component: React.lazy(() => import('/src/apps/SiteView.jsx')) },
-    'EnviroMon': { title: 'EnviroMon', icon: Icons.PowerIcon, component: React.lazy(() => import('/src/apps/EnviroMon.jsx')) },
-    'ClientConnect': { title: 'ClientConnect', icon: Icons.GlobeIcon, component: React.lazy(() => import('/src/apps/ClientConnect.jsx')) },
-    'SysLog': { title: 'SysLog', icon: Icons.AlertIcon, component: React.lazy(() => import('/src/apps/SysLog.jsx')) },
-    'SystemSettings': { title: 'System Settings', icon: Icons.SettingsIcon, component: React.lazy(() => import('/src/apps/SystemSettings.jsx')) },
-    'ISPConnect': { title: 'ISP Connect', icon: Icons.WifiIcon, component: React.lazy(() => import('/src/apps/ISPConnect.jsx')) },
-    'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('/src/apps/PowerManager.jsx')) },
-    'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('/src/apps/ScriptIDE.jsx')) },
-    'DaemonManager': { title: 'Daemon Manager', icon: Icons.BotIcon, component: React.lazy(() => import('/src/apps/DaemonManager.jsx')) },
-    'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('/src/apps/ScriptingGuide.jsx')) },
-};
 

@@ -2,22 +2,26 @@ import React from 'react';
 import useGameStore from '/src/store/gameStore.js';
 
 const Taskbar = ({ openWindows, onTaskbarClick, activeWindowId, appsConfig }) => {
-    // Correctly select data from the nested state object
     const time = useGameStore(state => state.state.time);
     const cash = useGameStore(state => state.state.finances.cash);
     const isPaused = useGameStore(state => state.state.isPaused);
     const gameSpeed = useGameStore(state => state.state.gameSpeed);
     
-    // Actions are still selected from the top level
     const togglePause = useGameStore(state => state.togglePause);
     const setGameSpeed = useGameStore(state => state.setGameSpeed);
     
-    const speeds = [1, 5, 15, 60];
+    const speeds = [
+        { label: '1x', value: 1 },
+        { label: '1m', value: 60 },
+        { label: '5m', value: 300 },
+        { label: '1h', value: 3600 }
+    ];
     
     return (
         <div className="absolute bottom-0 left-0 right-0 h-12 bg-gray-900/80 backdrop-blur-sm text-white flex items-center justify-between px-4 border-t border-gray-700 z-[1000]">
           <div className="flex items-center space-x-2">
             {Object.values(openWindows).filter(w => w.isOpen).map(win => {
+              // --- THE FIX: Corrected typo from apps-config to appsConfig ---
               if (!appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
               const IconComponent = appsConfig[win.appId].icon;
               return (
@@ -36,15 +40,16 @@ const Taskbar = ({ openWindows, onTaskbarClick, activeWindowId, appsConfig }) =>
               <button onClick={togglePause} className="font-bold text-lg px-2">{isPaused ? '▶' : '❚❚'}</button>
               <div className="flex gap-1">
                 {speeds.map(s => (
-                  <button key={s} onClick={() => setGameSpeed(s)} className={`px-2 py-0.5 text-xs rounded ${gameSpeed === s ? 'bg-blue-600' : 'bg-gray-700'}`}>{s}x</button>
+                  <button key={s.label} onClick={() => setGameSpeed(s.value)} className={`px-2 py-0.5 text-xs rounded ${gameSpeed === s.value ? 'bg-blue-600' : 'bg-gray-700'}`}>{s.label}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div className="font-mono text-lg text-green-400">${cash.toLocaleString()}</div>
+          <div className="font-mono text-lg text-green-400">${cash.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
         </div>
       );
 };
 
 export default Taskbar;
+
 
