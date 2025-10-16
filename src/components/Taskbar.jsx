@@ -21,8 +21,7 @@ const Taskbar = ({ openWindows, onTaskbarClick, activeWindowId, appsConfig }) =>
         <div className="absolute bottom-0 left-0 right-0 h-12 bg-gray-900/80 backdrop-blur-sm text-white flex items-center justify-between px-4 border-t border-gray-700 z-[1000]">
           <div className="flex items-center space-x-2">
             {Object.values(openWindows).filter(w => w.isOpen).map(win => {
-              // --- THE FIX: Corrected typo from apps-config to appsConfig ---
-              if (!appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
+              if (!appsConfig || !appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
               const IconComponent = appsConfig[win.appId].icon;
               return (
                 <button key={win.id} onClick={() => onTaskbarClick(win.id)} className={`p-1 rounded-md hover:bg-gray-700 ${activeWindowId === win.id && !win.isMinimized ? 'bg-blue-700' : ''}`}>
@@ -51,5 +50,4 @@ const Taskbar = ({ openWindows, onTaskbarClick, activeWindowId, appsConfig }) =>
 };
 
 export default Taskbar;
-
 

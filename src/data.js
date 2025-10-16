@@ -1,3 +1,24 @@
+import React from 'react';
+import Icons from '/src/components/Icons.jsx';
+
+// --- TASK 1.3: APPS_CONFIG has been relocated here from App.jsx ---
+export const APPS_CONFIG = {
+    'OrderUp': { title: 'OrderUp', icon: Icons.FolderIcon, component: React.lazy(() => import('/src/apps/OrderUp.jsx')) },
+    'TaskRunner': { title: 'TaskRunner', icon: Icons.CalendarIcon, component: React.lazy(() => import('/src/apps/TaskRunner.jsx')) },
+    'TeamView': { title: 'TeamView', icon: Icons.UsersIcon, component: React.lazy(() => import('/src/apps/TeamView.jsx')) },
+    'NetAdmin': { title: 'NetAdmin', icon: Icons.TerminalIcon, component: React.lazy(() => import('/src/apps/NetAdmin.jsx')) },
+    'LayoutView': { title: 'LayoutView', icon: Icons.LayoutIcon, component: React.lazy(() => import('/src/apps/LayoutView.jsx')) },
+    'SiteView': { title: 'SiteView', icon: Icons.CameraIcon, component: React.lazy(() => import('/src/apps/SiteView.jsx')) },
+    'EnviroMon': { title: 'EnviroMon', icon: Icons.PowerIcon, component: React.lazy(() => import('/src/apps/EnviroMon.jsx')) },
+    'ClientConnect': { title: 'ClientConnect', icon: Icons.GlobeIcon, component: React.lazy(() => import('/src/apps/ClientConnect.jsx')) },
+    'SysLog': { title: 'SysLog', icon: Icons.AlertIcon, component: React.lazy(() => import('/src/apps/SysLog.jsx')) },
+    'SystemSettings': { title: 'System Settings', icon: Icons.SettingsIcon, component: React.lazy(() => import('/src/apps/SystemSettings.jsx')) },
+    'ISPConnect': { title: 'ISP Connect', icon: Icons.WifiIcon, component: React.lazy(() => import('/src/apps/ISPConnect.jsx')) },
+    'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('/src/apps/PowerManager.jsx')) },
+    'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('/src/apps/ScriptIDE.jsx')) },
+    'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('/src/apps/ScriptingGuide.jsx')) },
+};
+
 export const PRIORITIES = { Emergency: 4, High: 3, Normal: 2, Low: 1 };
 export const PRIORITY_COLORS = { Emergency: 'bg-red-600', High: 'bg-orange-500', Normal: 'bg-yellow-500', Low: 'bg-green-600' };
 
