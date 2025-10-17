@@ -6,6 +6,7 @@ const API = {
     // --- System Commands ---
     'system': {
         'list': (agent, scriptName, _target, type) => {
+            // --- THE FIX: Access nested state object ---
             const state = useGameStore.getState().state;
             let results = [];
             switch (type) {
@@ -68,6 +69,7 @@ const API = {
 const findTarget = (targetId) => {
     if (['system', 'player'].includes(targetId)) return { type: 'system', id: targetId };
     
+    // --- THE FIX: Access nested state object ---
     const state = useGameStore.getState().state;
     const employee = state.employees.find(e => e.id === targetId || e.name === targetId);
     if (employee) return { ...employee, entityType: 'employee' };
@@ -82,6 +84,7 @@ const findTarget = (targetId) => {
 };
 
 const hasPermission = (agentName, requiredPermission) => {
+    // --- THE FIX: Access nested state object ---
     const agent = useGameStore.getState().state.scripting.agents[agentName];
     return agent && agent.permissions.includes(requiredPermission);
 };
@@ -124,6 +127,7 @@ async function parseAndExecuteCommand(line, agentName, scriptName, callStack) {
         if (!targetName) throw new Error("'call' command requires a target script or agent name.");
         if (callStack.includes(targetName)) throw new Error(`Recursive call detected: Cannot call '${targetName}'.`);
 
+        // --- THE FIX: Access nested state object ---
         const state = useGameStore.getState().state;
         const targetScript = Object.values(state.scripting.scripts).find(s => s.name === targetName);
         const targetAgent = state.scripting.agents[targetName];
@@ -186,4 +190,3 @@ export async function executeScriptBlock(scriptContent, agentName, scriptName, c
     }
     return 'SUCCESS';
 }
-

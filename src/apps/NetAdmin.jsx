@@ -3,10 +3,9 @@ import useGameStore from '/src/store/gameStore.js';
 import { TASK_DEFINITIONS } from '/src/data.js';
 
 const NetAdmin = () => {
-    // Action from top level
     const createTask = useGameStore(state => state.createTask);
     
-    // Data from nested state
+    // --- THE FIX: Select from the nested 'state' object ---
     const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
     const nextInternalIp = useGameStore(state => state.state.nextInternalIp);
     const publicIpBlock = useGameStore(state => state.state.network.publicIpBlock);
@@ -122,4 +121,3 @@ const NetAdmin = () => {
 };
 
 export default NetAdmin;
-

@@ -2,6 +2,7 @@ import React from 'react';
 import useGameStore from '/src/store/gameStore.js';
 
 const SysLog = () => {
+    // --- THE FIX: Select from the nested 'state' object ---
     const eventLog = useGameStore(state => state.state.eventLog);
 
     return (
@@ -17,4 +18,3 @@ const SysLog = () => {
 };
 
 export default SysLog;
-

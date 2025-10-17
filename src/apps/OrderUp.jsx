@@ -5,6 +5,7 @@ import { HARDWARE_CATALOG } from '/src/data.js';
 const OrderUp = () => {
     const spendCash = useGameStore(state => state.spendCash);
     const addToInventory = useGameStore(state => state.addToInventory);
+    // --- THE FIX: Select from the nested 'state' object ---
     const cash = useGameStore(state => state.state.finances.cash);
     const inventory = useGameStore(state => state.state.inventory);
 
@@ -71,4 +72,3 @@ const OrderUp = () => {
 };
 
 export default OrderUp;
-

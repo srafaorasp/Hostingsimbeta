@@ -4,6 +4,7 @@ import { CLIENT_CONTRACTS, HARDWARE_CATALOG } from '/src/data.js';
 
 const ClientConnect = () => {
     const acceptContract = useGameStore(state => state.acceptContract);
+    // --- THE FIX: Select from the nested 'state' object ---
     const activeContracts = useGameStore(state => state.state.activeContracts);
     const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
 
@@ -62,4 +63,3 @@ const ClientConnect = () => {
 };
 
 export default ClientConnect;
-

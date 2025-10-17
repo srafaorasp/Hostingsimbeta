@@ -4,6 +4,7 @@ import { ISP_CONTRACTS } from '/src/data.js';
 
 const ISPConnect = () => {
     const signIspContract = useGameStore(state => state.signIspContract);
+    // --- THE FIX: Select from the nested 'state' object ---
     const ispContract = useGameStore(state => state.state.network.ispContract);
     const publicIpBlock = useGameStore(state => state.state.network.publicIpBlock);
     const cash = useGameStore(state => state.state.finances.cash);
@@ -60,4 +61,3 @@ const ISPConnect = () => {
 };
 
 export default ISPConnect;
-

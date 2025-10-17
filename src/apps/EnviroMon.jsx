@@ -2,6 +2,7 @@ import React from 'react';
 import useGameStore from '/src/store/gameStore.js';
 
 const EnviroMon = () => {
+    // --- THE FIX: Select from the nested 'state' object ---
     const power = useGameStore(state => state.state.power);
     const cooling = useGameStore(state => state.state.cooling);
     const serverRoomTemp = useGameStore(state => state.state.serverRoomTemp);
@@ -44,4 +45,3 @@ const EnviroMon = () => {
 };
 
 export default EnviroMon;
-

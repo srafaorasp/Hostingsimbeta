@@ -1,19 +1,26 @@
 import { useEffect } from 'react';
 import useGameStore from '/src/store/gameStore.js';
-import { HARDWARE_CATALOG, PRIORITIES } from '/src/data.js';
+import { HARDWARE_CATALOG, GRID_POWER_COST_PER_KWH, PRIORITIES } from '/src/data.js';
 import { executeScriptBlock } from '/src/game/scriptingEngine.js';
 
 const useGameLoop = () => {
     useEffect(() => {
         const interval = setInterval(() => {
             const store = useGameStore.getState();
-            let currentState = store.state;
+            // --- THE FIX: Now accessing the nested state object ---
+            const currentState = store.state;
 
             if (currentState.isPaused) return;
 
+            // --- Time Progression ---
             store.advanceTime(currentState.gameSpeed);
-            currentState = useGameStore.getState().state; // Re-fetch state after time advance
-            const newCurrentTime = currentState.time;
+            const newCurrentTime = useGameStore.getState().state.time;
+
+            // --- Monthly Billing Cycle ---
+            const currentMonth = newCurrentTime.getMonth();
+            if (currentMonth !== currentState.lastMonth) {
+                store.processMonthlyBilling();
+            }
 
             // --- Task completion logic ---
             const completedTasks = currentState.tasks.filter(t => t.status === 'In Progress' && new Date(t.completionTime) <= newCurrentTime);
@@ -56,61 +63,36 @@ const useGameLoop = () => {
                     }
                 });
             }
-            
-            // --- Physical Environment Simulation ---
-            const AMBIENT_TEMP = 21.0;
-            const CRITICAL_TEMP = 35.0;
-            let totalPowerLoad = 0;
-            let totalHeatLoad = 0;
-            const onlineServers = [];
 
-            Object.entries(currentState.dataCenterLayout).forEach(([rackId, rack]) => {
-                if (rack.contents) {
-                    rack.contents.forEach(item => {
-                        if (['ONLINE', 'NETWORKED'].includes(item.status)) {
-                            const details = HARDWARE_CATALOG.find(h => h.id === item.type);
-                            if (details) {
-                                totalPowerLoad += details.powerDraw || 0;
-                                totalHeatLoad += details.heatOutput || 0;
-                                if (details.type === 'SERVER') {
-                                    onlineServers.push({ rackId, itemId: item.id });
-                                }
-                            }
+            // --- Physical Environment Simulation ---
+            const powerCalculations = { totalLoad: 0, totalCapacity: 0 };
+            const coolingCalculations = { totalLoad: 0, totalCapacity: 0 };
+
+            Object.values(currentState.dataCenterLayout).forEach(item => {
+                const details = HARDWARE_CATALOG.find(h => h.id === item.type);
+                if (!details) return;
+
+                if (item.type.includes('crac') && item.status === 'ONLINE') {
+                    coolingCalculations.totalCapacity += details.coolingCapacity || 0;
+                    powerCalculations.totalLoad += details.powerDraw || 0;
+                }
+
+                if (item.contents) {
+                    item.contents.forEach(device => {
+                        const deviceDetails = HARDWARE_CATALOG.find(h => h.id === device.type);
+                        if (device.status === 'ONLINE' || device.status === 'LAN_CONFIGURED' || device.status === 'NETWORKED') {
+                            powerCalculations.totalLoad += deviceDetails.powerDraw || 0;
+                            coolingCalculations.totalLoad += deviceDetails.heatOutput || 0;
                         }
                     });
                 }
             });
-
-            const heatDelta = totalHeatLoad - currentState.cooling.capacity;
-            let newServerRoomTemp = currentState.serverRoomTemp;
-
-            if (heatDelta > 0) {
-                newServerRoomTemp += (heatDelta / 5000) * (currentState.gameSpeed / 60);
-            } else {
-                newServerRoomTemp = Math.max(AMBIENT_TEMP, newServerRoomTemp + (heatDelta / 10000) * (currentState.gameSpeed / 60));
-            }
             
-            if (newServerRoomTemp > CRITICAL_TEMP) {
-                const failureChance = (newServerRoomTemp - CRITICAL_TEMP) * 0.01;
-                if (Math.random() < failureChance && onlineServers.length > 0) {
-                    const serverToFail = onlineServers[Math.floor(Math.random() * onlineServers.length)];
-                    store.failHardware(serverToFail.rackId, serverToFail.itemId);
-                }
-            }
+            const tempDelta = (coolingCalculations.totalLoad - coolingCalculations.totalCapacity) / 5000;
+            const newTemp = Math.max(20, currentState.serverRoomTemp + tempDelta);
 
-            store.updateEnvironment({
-                powerLoad: totalPowerLoad,
-                coolingLoad: totalHeatLoad,
-                serverRoomTemp: newServerRoomTemp,
-            });
-
-            // --- Monthly Financial Cycle ---
-            const lastMonth = currentState.lastMonth;
-            const currentMonth = newCurrentTime.getMonth();
-            if (currentMonth !== lastMonth) {
-                store.processMonthlyBilling();
-            }
-
+            store.updatePowerAndCooling(powerCalculations, coolingCalculations, newTemp);
+            
             // --- Scripting Engine Loop ---
             const scriptsToRun = Object.values(currentState.scripting.scripts).filter(script => 
                 script.status === 'running' &&

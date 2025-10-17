@@ -2,6 +2,7 @@ import React, { Suspense, useEffect } from 'react';
 import useGameStore from '/src/store/gameStore.js';
 import useGameLoop from '/src/hooks/useGameLoop.js';
 import { APPS_CONFIG } from '/src/data.js';
+import { shallow } from 'zustand/shallow';
 
 import LoginScreen from '/src/components/LoginScreen.jsx';
 import Window from '/src/components/Window.jsx';
@@ -12,28 +13,30 @@ import ToastContainer from '/src/components/Toast.jsx';
 import AlertContainer from '/src/components/Alert.jsx';
 
 export default function App() {
-    // --- State is now managed by Zustand ---
-    const [isLoggedIn, setIsLoggedIn] = React.useState(false); // Local UI state, doesn't need to be saved.
+    // --- THE FIX: All state selectors now point to the nested 'state' object ---
+    const isBooted = useGameStore((s) => s.state.isBooted);
+    const wallpaper = useGameStore((s) => s.state.ui.desktopSettings.wallpaper);
+    const theme = useGameStore((s) => s.state.ui.desktopSettings.theme);
+    const windows = useGameStore((s) => s.state.ui.windows);
+    const activeWindowId = useGameStore((s) => s.state.ui.activeWindowId);
+    const toasts = useGameStore((s) => s.state.scripting.toasts);
+    const alerts = useGameStore((s) => s.state.scripting.alerts);
     
-    // --- Selectors for game state ---
-    const newGame = useGameStore(state => state.newGame);
-    const loadGame = useGameStore(state => state.loadGame);
-    const { theme, wallpaper } = useGameStore(state => state.state.ui.desktopSettings);
-    const toasts = useGameStore(state => state.state.scripting.toasts);
-    const alerts = useGameStore(state => state.state.scripting.alerts);
-    const removeToast = useGameStore(state => state.removeToast);
-    const removeAlert = useGameStore(state => state.removeAlert);
-
-    // --- Selectors for UI state ---
-    const { windows, activeWindowId } = useGameStore(state => state.state.ui);
-
-    // --- Selectors for UI actions ---
-    const openApp = useGameStore(state => state.openApp);
-    const closeWindow = useGameStore(state => state.closeWindow);
-    const minimizeWindow = useGameStore(state => state.minimizeWindow);
-    const maximizeWindow = useGameStore(state => state.maximizeWindow);
-    const focusWindow = useGameStore(state => state.focusWindow);
-    const handleTaskbarClick = useGameStore(state => state.handleTaskbarClick);
+    // --- Action hooks are unchanged as actions are now top-level and stable ---
+    const { newGame, loadGame, openApp, closeWindow, minimizeWindow, maximizeWindow, focusWindow, removeToast, removeAlert } = useGameStore(
+        (state) => ({
+            newGame: state.newGame,
+            loadGame: state.loadGame,
+            openApp: state.openApp,
+            closeWindow: state.closeWindow,
+            minimizeWindow: state.minimizeWindow,
+            maximizeWindow: state.maximizeWindow,
+            focusWindow: state.focusWindow,
+            removeToast: state.removeToast,
+            removeAlert: state.removeAlert,
+        }),
+        shallow
+    );
 
     useGameLoop();
 
@@ -44,10 +47,11 @@ export default function App() {
     const handleLogin = (slotName) => {
         if (slotName) loadGame(slotName);
         else newGame();
-        setIsLoggedIn(true);
     };
     
-    if (!isLoggedIn) return <LoginScreen onLogin={handleLogin} />;
+    if (!isBooted) {
+        return <LoginScreen onLogin={handleLogin} />;
+    }
 
     return (
         <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
@@ -69,34 +73,17 @@ export default function App() {
             <Suspense fallback={<div className="text-white">Loading...</div>}>
                 {Object.values(windows).map(win => {
                     if (!win.isOpen || win.isMinimized) return null;
-                    const AppToRender = APPS_CONFIG[win.appId].component;
+                    const AppToRender = APPS_CONFIG[win.appId]?.component;
+                    if (!AppToRender) return null; 
                     return (
-                        <Window 
-                            key={win.id} 
-                            id={win.id} 
-                            title={win.title} 
-                            zIndex={win.zIndex} 
-                            isActive={activeWindowId === win.id} 
-                            isMaximized={win.isMaximized} 
-                            onClose={closeWindow} 
-                            onMinimize={minimizeWindow} 
-                            onMaximize={maximizeWindow} 
-                            onFocus={focusWindow} 
-                            initialPosition={win.position} 
-                            initialSize={win.size}
-                        >
+                        <Window key={win.id} id={win.id} title={win.title} zIndex={win.zIndex} isActive={activeWindowId === win.id} isMaximized={win.isMaximized} onClose={closeWindow} onMinimize={minimizeWindow} onMaximize={maximizeWindow} onFocus={focusWindow} initialPosition={win.position} initialSize={win.size}>
                             <AppToRender />
                         </Window>
                     );
                 })}
             </Suspense>
 
-            <Taskbar 
-                openWindows={windows} 
-                onTaskbarClick={handleTaskbarClick} 
-                activeWindowId={activeWindowId} 
-                appsConfig={APPS_CONFIG}
-            />
+            <Taskbar appsConfig={APPS_CONFIG} />
             <ToastContainer toasts={toasts} onDismiss={removeToast} />
             <AlertContainer alerts={alerts} onDismiss={removeAlert} />
         </div>

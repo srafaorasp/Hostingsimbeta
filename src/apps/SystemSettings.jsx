@@ -7,8 +7,7 @@ const SystemSettings = () => {
     const saveGame = useGameStore(state => state.saveGame);
     const setTheme = useGameStore(state => state.setTheme);
     const setWallpaper = useGameStore(state => state.setWallpaper);
-    // --- THIS IS THE FIX ---
-    // Corrected the selector to point to the new state structure for UI settings.
+    // --- THE FIX: Select from the nested 'state' object ---
     const theme = useGameStore(state => state.state.ui.desktopSettings.theme);
     const getFullState = () => useGameStore.getState().state;
 

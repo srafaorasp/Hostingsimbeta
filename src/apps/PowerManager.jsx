@@ -4,6 +4,7 @@ import { HARDWARE_CATALOG } from '/src/data.js';
 
 const PowerManager = () => {
     const toggleGridPower = useGameStore(state => state.toggleGridPower);
+    // --- THE FIX: Select from the nested 'state' object ---
     const gridActive = useGameStore(state => state.state.power.gridActive);
     const layout = useGameStore(state => state.state.dataCenterLayout);
     const lastBill = useGameStore(state => state.state.finances.lastBill);
@@ -57,4 +58,3 @@ const PowerManager = () => {
 };
 
 export default PowerManager;
-

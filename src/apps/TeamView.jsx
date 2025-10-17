@@ -5,6 +5,7 @@ import { CANDIDATES } from '/src/data.js';
 const TeamView = () => {
     const hireEmployee = useGameStore(state => state.hireEmployee);
     const spendCash = useGameStore(state => state.spendCash);
+    // --- THE FIX: Select from the nested 'state' object ---
     const employees = useGameStore(state => state.state.employees);
     const hiredIds = new Set(employees.map(e => e.id));
 
@@ -68,4 +69,3 @@ const TeamView = () => {
 };
 
 export default TeamView;
-

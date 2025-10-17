@@ -9,7 +9,7 @@ const ScriptIDE = () => {
         createScript, updateScript, deleteScript
     } = useGameStore.getState();
     
-    // Zustand state
+    // --- THE FIX: Select from the nested 'state' object ---
     const agents = useGameStore(state => state.state.scripting.agents);
     const scripts = useGameStore(state => state.state.scripting.scripts);
 

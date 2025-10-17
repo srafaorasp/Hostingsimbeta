@@ -4,15 +4,12 @@ import { TASK_DEFINITIONS, PRIORITIES, PRIORITY_COLORS } from '/src/data.js';
 
 const TaskCreator = ({ taskDef }) => {
     const createTask = useGameStore(state => state.createTask);
-    const employees = useGameStore(state => state.state.employees);
-    const inventory = useGameStore(state => state.state.inventory);
-    const stagedHardware = useGameStore(state => state.state.stagedHardware);
-    const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
-    const tasks = useGameStore(state => state.state.tasks);
+
+    // --- THE FIX: Select from the nested 'state' object ---
+    const { employees, inventory, stagedHardware, dataCenterLayout, tasks } = useGameStore(state => state.state);
     
     const [priority, setPriority] = useState('Normal');
-    const [selectedTarget, setSelectedTarget] = useState(null);
-    const [targetPdu, setTargetPdu] = useState('');
+    const [selectedTarget, setSelectedTarget] = useState({ location: '', item: '', pdu: '' });
 
     const hasHardware = useMemo(() => 
         taskDef.requiredHardware ? Object.entries(taskDef.requiredHardware).every(([itemId, count]) => (inventory[itemId] || 0) >= count) : true
@@ -35,17 +32,22 @@ const TaskCreator = ({ taskDef }) => {
         let targets = [];
         switch (taskDef.needsTarget) {
             case 'RACK_UNPOWERED': {
-                const pdus = Object.keys(dataCenterLayout).filter(k => dataCenterLayout[k].type === 'PDU');
+                const pdus = Object.values(dataCenterLayout).flatMap(r => r.contents).filter(c => c.type.includes('PDU')).map(p => p.id);
                 if (pdus.length === 0) break;
                 targets = Object.keys(dataCenterLayout)
                     .filter(locId => dataCenterLayout[locId].type === 'RACK' && !dataCenterLayout[locId].pdu)
-                    .map(locId => ({ text: `Rack at ${locId}`, locationId: locId, needsPdu: true, pdus }));
+                    .map(locId => ({ text: `Rack at ${locId}`, value: { location: locId, pdu: pdus[0] } })); // Default to first PDU
                 break;
             }
+             case 'RACK':
+                targets = Object.keys(dataCenterLayout)
+                    .filter(locId => dataCenterLayout[locId].type === 'RACK')
+                    .map(locId => ({ text: `Rack at ${locId}`, value: { location: locId } }));
+                break;
             case 'RACK_POWERED':
                 targets = Object.keys(dataCenterLayout)
                     .filter(locId => dataCenterLayout[locId].type === 'RACK' && dataCenterLayout[locId].pdu)
-                    .map(locId => ({ text: `Rack at ${locId}`, locationId: locId }));
+                    .map(locId => ({ text: `Rack at ${locId}`, value: { location: locId } }));
                 break;
             case 'SERVER_INSTALLED':
             case 'SERVER_ONLINE':
@@ -66,7 +68,7 @@ const TaskCreator = ({ taskDef }) => {
                                 : item.status === requiredStatus;
                             
                             if ((item.type.includes('server') || item.type.includes('switch') || item.type.includes('router')) && statusMatch && rack.pdu) {
-                                tempTargets.push({ text: `${item.hostname || item.type} (${item.id.slice(-4)}) in ${locId}`, locationId: locId, itemId: item.id });
+                                tempTargets.push({ text: `${item.hostname || item.type} (${item.id.slice(-4)}) in ${locId}`, value: { location: locId, item: item.id } });
                             }
                         });
                     }
@@ -78,75 +80,49 @@ const TaskCreator = ({ taskDef }) => {
         return targets.sort((a, b) => a.text.localeCompare(b.text));
     }, [dataCenterLayout, taskDef.needsTarget]);
     
-    const dependencyMet = !taskDef.needsTarget || availableTargets.length > 0;
-
     useEffect(() => {
-        const firstTarget = availableTargets.length > 0 ? availableTargets[0] : null;
-        setSelectedTarget(firstTarget);
-        if (firstTarget && firstTarget.needsPdu && firstTarget.pdus.length > 0) {
-            setTargetPdu(firstTarget.pdus[0]);
+        if (availableTargets.length > 0) {
+            setSelectedTarget(availableTargets[0].value);
         } else {
-             setTargetPdu('');
+            setSelectedTarget({ location: '', item: '', pdu: '' });
         }
     }, [JSON.stringify(availableTargets)]);
 
-    const canCreate = hasHardware && hasSkilledEmployee && hasStaged && dependencyMet && (!taskDef.needsTarget || selectedTarget);
+    const canCreate = hasHardware && hasSkilledEmployee && hasStaged && (!taskDef.needsTarget || selectedTarget.location);
 
     const handleSchedule = () => {
-        let taskPayload = { ...taskDef, priority };
-
+        let taskPayload = { ...taskDef, priority, targetLocation: selectedTarget.location, targetItem: selectedTarget.item, targetPdu: selectedTarget.pdu };
         if (taskDef.needsStaged) {
             const unreservedItem = stagedHardware.find(item => item.type === taskDef.needsStaged && !tasks.some(t => t.requiredStaged === item.id));
-            if (unreservedItem) {
-                taskPayload.requiredStaged = unreservedItem.id;
-            } else {
-                 console.error("No unreserved staged item available for task.");
-                 return;
-            }
-        }
-        
-        if (taskDef.needsTarget) {
-            if (selectedTarget) {
-                taskPayload.targetLocation = selectedTarget.locationId;
-                if (selectedTarget.itemId) {
-                    taskPayload.targetItem = selectedTarget.itemId;
-                }
-                if(targetPdu) {
-                    taskPayload.targetPdu = targetPdu;
-                }
-            } else {
-                 console.error("Target required but not selected for task.");
-                 return;
-            }
+            if (unreservedItem) taskPayload.requiredStaged = unreservedItem.id;
+            else return;
         }
         createTask(taskPayload);
+    };
+
+    const handleTargetChange = (e) => {
+        const selectedValue = e.target.value;
+        const target = availableTargets.find(t => JSON.stringify(t.value) === selectedValue);
+        if (target) {
+            setSelectedTarget(target.value);
+        }
     };
     
     return (
         <div className="p-2 bg-gray-700 rounded-md">
             <p className="font-bold">{taskDef.description}</p>
-            <p className="text-xs text-gray-400">Requires: {taskDef.requiredSkill}</p>
-            {taskDef.needsTarget && (
+            <div className="text-xs mt-1 space-y-1">
+                {!hasSkilledEmployee && <p className="text-red-400">Missing skill: {taskDef.requiredSkill}</p>}
+                {!hasHardware && <p className="text-red-400">Missing items in inventory.</p>}
+                {!hasStaged && <p className="text-red-400">No staged hardware available.</p>}
+                {taskDef.needsTarget && availableTargets.length === 0 && <p className="text-red-400">No valid targets available.</p>}
+            </div>
+            
+            {taskDef.needsTarget && availableTargets.length > 0 && (
                 <div className="text-xs mt-1 space-y-1">
-                    {dependencyMet ? <>
-                        <select 
-                            value={selectedTarget ? `${selectedTarget.locationId}-${selectedTarget.itemId || ''}` : ''} 
-                            onChange={e => {
-                                const val = e.target.value;
-                                const target = availableTargets.find(t => `${t.locationId}-${t.itemId || ''}` === val) || null;
-                                setSelectedTarget(target);
-                            }} 
-                            className="w-full p-1 bg-gray-800 rounded"
-                        >
-                            <option value="">Select a target...</option>
-                            {availableTargets.map(t => <option key={`${t.locationId}-${t.itemId || ''}`} value={`${t.locationId}-${t.itemId || ''}`}>{t.text}</option>)}
-                        </select>
-                        {selectedTarget && selectedTarget.needsPdu && (
-                            <select value={targetPdu} onChange={e => setTargetPdu(e.target.value)} className="w-full p-1 bg-gray-800 rounded">
-                               {selectedTarget.pdus.map(pduId => <option key={pduId} value={pduId}>{pduId}</option>)}
-                            </select>
-                        )}
-                    </> : <p className="text-xs text-red-400 mt-1">Dependencies not met.</p> }
+                    <select value={JSON.stringify(selectedTarget)} onChange={handleTargetChange} className="w-full p-1 bg-gray-800 rounded">
+                        {availableTargets.map((t, i) => <option key={i} value={JSON.stringify(t.value)}>{t.text}</option>)}
+                    </select>
                 </div>
             )}
             <div className="flex justify-between items-center mt-2">
@@ -159,6 +135,7 @@ const TaskCreator = ({ taskDef }) => {
 
 const TaskRunner = () => {
     const abortTask = useGameStore(state => state.abortTask);
+    // --- THE FIX: Select from the nested 'state' object ---
     const tasks = useGameStore(state => state.state.tasks);
     const employees = useGameStore(state => state.state.employees);
     const time = useGameStore(state => state.state.time);
@@ -178,7 +155,7 @@ const TaskRunner = () => {
             <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">TaskRunner</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow min-h-0">
                 <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Available Jobs</h3><div className="mt-2 space-y-2">{TASK_DEFINITIONS.map(taskDef => <TaskCreator key={taskDef.id} taskDef={taskDef} />)}</div></div>
-                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Task Queue</h3><div className="mt-2 space-y-2">{tasks.length === 0 ? <p className="text-gray-400">No tasks in queue.</p> : [...tasks].sort((a,b) => (PRIORITIES[b.priority] || 0) - (PRIORITIES[a.priority] || 0)).map(task => { const emp = task.assignedTo ? employees.find(e => e.id === task.assignedTo) : null; return (<div key={task.id} className="p-2 bg-gray-700 rounded-md text-sm"><div className="flex justify-between items-start"><div><strong>Task:</strong> {task.description}</div><span className={`px-2 py-0.5 text-xs rounded-full ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span></div><div>Status: {task.status}</div>{emp && <div>Assigned: {emp.name}</div>}{task.status === 'In Progress' && task.completionTime && <div>ETA: {formatETA(task.completionTime)}</div>}<button onClick={() => abortTask(task.id)} className="mt-2 text-xs bg-red-700 px-2 py-1 rounded hover:bg-red-600">Abort</button></div>);})}</div></div>
+                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Task Queue</h3><div className="mt-2 space-y-2">{tasks.length === 0 ? <p className="text-gray-400">No tasks in queue.</p> : [...tasks].sort((a,b) => PRIORITIES[b.priority] - PRIORITIES[a.priority]).map(task => { const emp = task.assignedTo ? employees.find(e => e.id === task.assignedTo) : null; return (<div key={task.id} className="p-2 bg-gray-700 rounded-md text-sm"><div className="flex justify-between items-start"><div><strong>Task:</strong> {task.description}</div><span className={`px-2 py-0.5 text-xs rounded-full ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span></div><div>Status: {task.status}</div>{emp && <div>Assigned: {emp.name}</div>}{task.status === 'In Progress' && task.completionTime && <div>ETA: {formatETA(task.completionTime)}</div>}<button onClick={() => abortTask(task.id)} className="mt-2 text-xs bg-red-700 px-2 py-1 rounded hover:bg-red-600">Abort</button></div>);})}</div></div>
             </div>
         </div> 
     );

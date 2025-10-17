@@ -39,6 +39,7 @@ const LayoutDetailModal = ({ slotId, rack, onClose }) => {
 };
 
 const LayoutView = () => {
+    // --- THE FIX: Select from the nested 'state' object ---
     const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
     const [selectedSlotId, setSelectedSlotId] = useState(null);
     const gridSlots = Array.from({ length: 24 }, (_, i) => `A${i + 1}`);
@@ -77,4 +78,3 @@ const LayoutView = () => {
 };
 
 export default LayoutView;
-
