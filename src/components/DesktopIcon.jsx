@@ -2,7 +2,7 @@ import React from 'react';
 import { useDrag } from 'react-dnd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.jsx';
 
-const DesktopIcon = ({ appId, onIconClick, appsConfig, position }) => {
+const DesktopIcon = ({ appId, onIconClick, appsConfig }) => {
     
     if (!appsConfig || !appsConfig[appId]) {
         return null; 
@@ -26,14 +26,12 @@ const DesktopIcon = ({ appId, onIconClick, appsConfig, position }) => {
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
+                    {/* --- THIS IS THE FIX --- */}
+                    {/* Removed absolute positioning and inline styles */}
                     <div 
                         ref={drag}
-                        className="absolute flex flex-col items-center justify-center text-center p-2 rounded-md hover:bg-blue-500/20 cursor-pointer w-24"
-                        style={{
-                            left: position.x,
-                            top: position.y,
-                            opacity: isDragging ? 0.5 : 1,
-                        }}
+                        className="relative flex flex-col items-center justify-center text-center p-2 rounded-md hover:bg-blue-500/20 cursor-pointer w-24"
+                        style={{ opacity: isDragging ? 0.5 : 1 }}
                         onDoubleClick={() => onIconClick(appId)}
                     >
                         <div className="w-8 h-8 flex items-center justify-center">
