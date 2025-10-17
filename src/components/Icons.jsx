@@ -15,7 +15,7 @@ function BatteryIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="
 function CodeIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8e44ad" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>)}
 function BotIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d35400" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>)}
 function BookIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>)}
+function LineChartIcon() { return (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 lucide lucide-line-chart"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>)}
 
-const Icons = { FolderIcon, CameraIcon, TerminalIcon, UsersIcon, CalendarIcon, LayoutIcon, PowerIcon, GlobeIcon, AlertIcon, SettingsIcon, WifiIcon, BatteryIcon, CodeIcon, BotIcon, BookIcon };
+const Icons = { FolderIcon, CameraIcon, TerminalIcon, UsersIcon, CalendarIcon, LayoutIcon, PowerIcon, GlobeIcon, AlertIcon, SettingsIcon, WifiIcon, BatteryIcon, CodeIcon, BotIcon, BookIcon, LineChartIcon };
 export default Icons;
-

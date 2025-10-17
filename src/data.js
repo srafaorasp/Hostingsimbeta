@@ -1,22 +1,23 @@
 import React from 'react';
-import Icons from '/src/components/Icons.jsx';
+import Icons from './components/Icons.jsx';
 
 // --- THIS OBJECT HAS BEEN MOVED BACK HERE TO PREVENT CIRCULAR DEPENDENCIES ---
 export const APPS_CONFIG = {
-    'OrderUp': { title: 'OrderUp', icon: Icons.FolderIcon, component: React.lazy(() => import('/src/apps/OrderUp.jsx')) },
-    'TaskRunner': { title: 'TaskRunner', icon: Icons.CalendarIcon, component: React.lazy(() => import('/src/apps/TaskRunner.jsx')) },
-    'TeamView': { title: 'TeamView', icon: Icons.UsersIcon, component: React.lazy(() => import('/src/apps/TeamView.jsx')) },
-    'NetAdmin': { title: 'NetAdmin', icon: Icons.TerminalIcon, component: React.lazy(() => import('/src/apps/NetAdmin.jsx')) },
-    'LayoutView': { title: 'LayoutView', icon: Icons.LayoutIcon, component: React.lazy(() => import('/src/apps/LayoutView.jsx')) },
-    'SiteView': { title: 'SiteView', icon: Icons.CameraIcon, component: React.lazy(() => import('/src/apps/SiteView.jsx')) },
-    'EnviroMon': { title: 'EnviroMon', icon: Icons.PowerIcon, component: React.lazy(() => import('/src/apps/EnviroMon.jsx')) },
-    'ClientConnect': { title: 'ClientConnect', icon: Icons.GlobeIcon, component: React.lazy(() => import('/src/apps/ClientConnect.jsx')) },
-    'SysLog': { title: 'SysLog', icon: Icons.AlertIcon, component: React.lazy(() => import('/src/apps/SysLog.jsx')) },
-    'SystemSettings': { title: 'System Settings', icon: Icons.SettingsIcon, component: React.lazy(() => import('/src/apps/SystemSettings.jsx')) },
-    'ISPConnect': { title: 'ISP Connect', icon: Icons.WifiIcon, component: React.lazy(() => import('/src/apps/ISPConnect.jsx')) },
-    'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('/src/apps/PowerManager.jsx')) },
-    'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('/src/apps/ScriptIDE.jsx')) },
-    'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('/src/apps/ScriptingGuide.jsx')) },
+    'OrderUp': { title: 'OrderUp', icon: Icons.FolderIcon, component: React.lazy(() => import('./apps/OrderUp.jsx')) },
+    'TaskRunner': { title: 'TaskRunner', icon: Icons.CalendarIcon, component: React.lazy(() => import('./apps/TaskRunner.jsx')) },
+    'TeamView': { title: 'TeamView', icon: Icons.UsersIcon, component: React.lazy(() => import('./apps/TeamView.jsx')) },
+    'NetAdmin': { title: 'NetAdmin', icon: Icons.TerminalIcon, component: React.lazy(() => import('./apps/NetAdmin.jsx')) },
+    'LayoutView': { title: 'LayoutView', icon: Icons.LayoutIcon, component: React.lazy(() => import('./apps/LayoutView.jsx')) },
+    'SiteView': { title: 'SiteView', icon: Icons.CameraIcon, component: React.lazy(() => import('./apps/SiteView.jsx')) },
+    'EnviroMon': { title: 'EnviroMon', icon: Icons.PowerIcon, component: React.lazy(() => import('./apps/EnviroMon.jsx')) },
+    'ClientConnect': { title: 'ClientConnect', icon: Icons.GlobeIcon, component: React.lazy(() => import('./apps/ClientConnect.jsx')) },
+    'SysLog': { title: 'SysLog', icon: Icons.AlertIcon, component: React.lazy(() => import('./apps/SysLog.jsx')) },
+    'SystemSettings': { title: 'System Settings', icon: Icons.SettingsIcon, component: React.lazy(() => import('./apps/SystemSettings.jsx')) },
+    'ISPConnect': { title: 'ISP Connect', icon: Icons.WifiIcon, component: React.lazy(() => import('./apps/ISPConnect.jsx')) },
+    'PowerManager': { title: 'Power Manager', icon: Icons.BatteryIcon, component: React.lazy(() => import('./apps/PowerManager.jsx')) },
+    'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('./apps/ScriptIDE.jsx')) },
+    'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('./apps/ScriptingGuide.jsx')) },
+    'Analytics': { title: 'Analytics', icon: Icons.LineChartIcon, component: React.lazy(() => import('./apps/Analytics.jsx')) },
 };
 
 
@@ -71,8 +72,6 @@ export const SCRIPT_PERMISSIONS = {
 };
 
 export const TASK_DEFINITIONS = [
-    // Unboxing tasks REMOVED
-
     // Installation tasks
     { id: 'install_rack', description: 'Install Server Rack', requiredSkill: 'Hardware Technician', durationMinutes: 120, location: 'Server Room', needsStaged: 'rack_std_01', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
     { id: 'install_pdu', description: 'Install PDU', requiredSkill: 'Hardware Technician', durationMinutes: 60, location: 'Server Room', needsStaged: 'pdu_basic_3kw', needsTarget: 'RACK', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },

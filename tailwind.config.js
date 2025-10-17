@@ -1,13 +1,22 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ["class"],
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    './pages/**/*.{js,jsx}',
+    './components/**/*.{js,jsx}',
+    './app/**/*.{js,jsx}',
+    './src/**/*.{js,jsx}',
   ],
+  prefix: "",
   theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
-      // This section maps our CSS variables to Tailwind utility classes
-      // so we can use classes like "bg-window-bg" in our components.
       colors: {
         'bg-dark': 'var(--color-bg-dark)',
         'bg-light': 'var(--color-bg-light)',
@@ -18,6 +27,7 @@ export default {
         'text-muted': 'var(--color-text-muted)',
         'border-color': 'var(--color-border)',
         'border-color-light': 'var(--color-border-light)',
+        'accent': 'var(--accent)', // Added for accent color theming
       },
       keyframes: {
         "accordion-down": {
@@ -37,3 +47,4 @@ export default {
   },
   plugins: [require("tailwindcss-animate")],
 }
+

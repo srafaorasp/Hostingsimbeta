@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
-import useGameStore from '/src/store/gameStore.js';
+import React, { useState, useRef } from 'react';
+import useGameStore from '../store/gameStore.js';
 
 const THEMES = [ { name: 'Dark', id: 'dark' }, { name: 'Light', id: 'light' }, { name: 'Blue', id: 'blue' } ];
+const ACCENT_COLORS = [ { name: 'Blue', id: 'blue' }, { name: 'Green', id: 'green' }, { name: 'Red', id: 'red' }, { name: 'Purple', id: 'purple' }, { name: 'Orange', id: 'orange' }];
+const TASKBAR_POSITIONS = [ { name: 'Bottom', id: 'bottom' }, { name: 'Top', id: 'top' }];
 
 const SystemSettings = () => {
-    const saveGame = useGameStore(state => state.saveGame);
-    const setTheme = useGameStore(state => state.setTheme);
-    // Wallpaper logic is now handled in App.jsx
+    const { 
+        saveGame, setTheme, setAccentColor, setTaskbarPosition, setWallpaper 
+    } = useGameStore.getState();
+
     const theme = useGameStore(state => state.state.ui.desktopSettings.theme);
+    const accentColor = useGameStore(state => state.state.ui.desktopSettings.accentColor);
+    const taskbarPosition = useGameStore(state => state.state.ui.desktopSettings.taskbarPosition);
     const getFullState = () => useGameStore.getState().state;
 
     const [saveName, setSaveName] = useState('');
     const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+    const fileInputRef = useRef(null);
 
     const handleSave = () => {
         if (!saveName) {
@@ -35,6 +41,15 @@ const SystemSettings = () => {
         URL.revokeObjectURL(url);
     };
 
+    const handleWallpaperChange = (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => setWallpaper(event.target.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
     return (
         <div className="p-4 bg-gray-800 text-gray-200 h-full flex flex-col space-y-4">
             {modal.isOpen && (
@@ -47,6 +62,7 @@ const SystemSettings = () => {
                 </div>
             )}
             <h2 className="text-xl font-bold border-b border-gray-600 pb-2">System Settings</h2>
+            
             <div className="bg-gray-900 p-3 rounded-md">
                 <h3 className="font-bold text-lg mb-2">Save Current Session</h3>
                 <div className="flex gap-2">
@@ -54,20 +70,47 @@ const SystemSettings = () => {
                     <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-1 rounded-md text-sm font-semibold hover:bg-blue-500">Save</button>
                 </div>
             </div>
+
             <div className="bg-gray-900 p-3 rounded-md">
-                <h3 className="font-bold text-lg mb-2">Color Theme</h3>
-                <div className="flex gap-2">
-                    {THEMES.map(themeOption => (
-                        <button key={themeOption.id} onClick={() => setTheme(themeOption.id)} className={`px-4 py-2 rounded-md text-sm font-semibold ${theme === themeOption.id ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                            {themeOption.name}
-                        </button>
-                    ))}
+                <h3 className="font-bold text-lg mb-2">Appearance</h3>
+                <div className="space-y-3">
+                    <div>
+                        <h4 className="font-semibold text-sm mb-1">Color Theme</h4>
+                        <div className="flex gap-2">
+                            {THEMES.map(themeOption => (
+                                <button key={themeOption.id} onClick={() => setTheme(themeOption.id)} className={`px-4 py-2 rounded-md text-sm font-semibold ${theme === themeOption.id ? 'bg-accent text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                    {themeOption.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-sm mb-1">Accent Color</h4>
+                        <div className="flex gap-2">
+                            {ACCENT_COLORS.map(colorOption => (
+                                <button key={colorOption.id} onClick={() => setAccentColor(colorOption.id)} className={`w-10 h-10 rounded-md border-2 ${accentColor === colorOption.id ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: `var(--theme-${colorOption.id})`.replace('theme-','').replace(' { --accent: ','').replace('; }','') }}></button>
+                            ))}
+                        </div>
+                    </div>
+                     <div>
+                        <h4 className="font-semibold text-sm mb-1">Taskbar Position</h4>
+                        <div className="flex gap-2">
+                            {TASKBAR_POSITIONS.map(posOption => (
+                                <button key={posOption.id} onClick={() => setTaskbarPosition(posOption.id)} className={`px-4 py-2 rounded-md text-sm font-semibold ${taskbarPosition === posOption.id ? 'bg-accent text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                    {posOption.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
-             <div className="bg-gray-900 p-3 rounded-md">
+
+            <div className="bg-gray-900 p-3 rounded-md">
                 <h3 className="font-bold text-lg mb-2">Desktop Wallpaper</h3>
-                <p className="text-sm text-gray-400">You can now change the wallpaper by right-clicking on the desktop.</p>
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
+                <button onClick={() => fileInputRef.current.click()} className="bg-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-600">Upload Custom Wallpaper</button>
             </div>
+            
             <div className="bg-gray-900 p-3 rounded-md mt-auto">
                 <h3 className="font-bold text-lg mb-2 text-yellow-400">Debugging</h3>
                 <button onClick={handleDebugDump} className="bg-yellow-600 text-gray-900 px-4 py-2 rounded-md text-sm font-semibold hover:bg-yellow-500">Download Debug Dump</button>

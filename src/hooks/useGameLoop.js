@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import useGameStore from '/src/store/gameStore.js';
-import { HARDWARE_CATALOG, GRID_POWER_COST_PER_KWH, PRIORITIES } from '/src/data.js';
-import { executeScriptBlock } from '/src/game/scriptingEngine.js';
+import useGameStore from '../store/gameStore.js';
+import { HARDWARE_CATALOG, PRIORITIES } from '../data.js';
+import { executeScriptBlock } from '../game/scriptingEngine.js';
 
 const useGameLoop = () => {
     useEffect(() => {
@@ -15,6 +15,11 @@ const useGameLoop = () => {
             // --- Time Progression ---
             store.advanceTime(currentState.gameSpeed);
             const newCurrentTime = useGameStore.getState().state.time;
+
+            // --- Add Cash History Data Point ---
+            if (newCurrentTime.getMinutes() % 30 === 0 && newCurrentTime.getSeconds() === 0) {
+                store.addCashHistory(newCurrentTime.getTime(), currentState.finances.cash);
+            }
 
             // --- Monthly Billing Cycle ---
             const currentMonth = newCurrentTime.getMonth();

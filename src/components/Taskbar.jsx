@@ -1,17 +1,23 @@
-import React from 'react';
-import useGameStore from '/src/store/gameStore.js';
+import React, { useState } from 'react';
+import useGameStore from '../store/gameStore.js';
+import { shallow } from 'zustand/shallow';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.jsx';
+import WindowPreview from './WindowPreview.jsx';
 
 const Taskbar = ({ appsConfig }) => {
-    // --- THE FIX: Select state slices individually to prevent unnecessary re-renders ---
-    const time = useGameStore((s) => s.state.time);
-    const cash = useGameStore((s) => s.state.finances.cash);
-    const isPaused = useGameStore((s) => s.state.isPaused);
-    const gameSpeed = useGameStore((s) => s.state.gameSpeed);
-    const openWindows = useGameStore((s) => s.state.ui.windows);
-    const activeWindowId = useGameStore((s) => s.state.ui.activeWindowId);
-    
-    // Actions are static and can be retrieved once without causing re-renders.
+    // 1. Use targeted, granular hooks for each piece of state that needs to be reactive.
+    const time = useGameStore(s => s.state.time);
+    const cash = useGameStore(s => s.state.finances.cash);
+    const isPaused = useGameStore(s => s.state.isPaused);
+    const gameSpeed = useGameStore(s => s.state.gameSpeed);
+    const openWindows = useGameStore(s => s.state.ui.windows, shallow);
+    const activeWindowId = useGameStore(s => s.state.ui.activeWindowId);
+    const taskbarPosition = useGameStore(s => s.state.ui.desktopSettings.taskbarPosition);
+
+    // 2. Get stable actions non-reactively.
     const { togglePause, setGameSpeed, focusWindow } = useGameStore.getState();
+
+    const [hoveredId, setHoveredId] = useState(null);
     
     const speeds = [
         { label: '1x', value: 1 },
@@ -21,20 +27,47 @@ const Taskbar = ({ appsConfig }) => {
     ];
 
     const handleTaskbarClick = (id) => {
-        // The logic here is simplified, but the key is to call the stable focusWindow function
         focusWindow(id);
     };
+
+    const taskbarClasses = `absolute left-0 right-0 h-12 bg-gray-900/80 backdrop-blur-sm text-white flex items-center justify-between px-4 z-[1000] ${
+        taskbarPosition === 'top' ? 'top-0 border-b border-gray-700' : 'bottom-0 border-t border-gray-700'
+    }`;
     
     return (
-        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gray-900/80 backdrop-blur-sm text-white flex items-center justify-between px-4 border-t border-gray-700 z-[1000]">
-          <div className="flex items-center space-x-2">
+        <div className={taskbarClasses}>
+          <div className="flex items-center space-x-2 h-full">
             {Object.values(openWindows).filter(w => w.isOpen).map(win => {
               if (!appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
               const IconComponent = appsConfig[win.appId].icon;
+              const previewPosition = taskbarPosition === 'top' ? 'top-full mt-2' : 'bottom-full mb-2';
+
               return (
-                <button key={win.id} onClick={() => handleTaskbarClick(win.id)} className={`p-1 rounded-md hover:bg-gray-700 ${activeWindowId === win.id && !win.isMinimized ? 'bg-blue-700' : ''}`}>
-                  <IconComponent />
-                </button>
+                <div 
+                    key={win.id}
+                    className="relative"
+                    onMouseEnter={() => setHoveredId(win.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                >
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button onClick={() => handleTaskbarClick(win.id)} className={`p-1 rounded-md hover:bg-gray-700 ${activeWindowId === win.id && !win.isMinimized ? 'bg-accent' : ''}`}>
+                                  <IconComponent />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{win.title}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    {hoveredId === win.id && !win.isMinimized && (
+                        <div className={`absolute left-1/2 -translate-x-1/2 ${previewPosition}`}>
+                            <WindowPreview window={win} />
+                        </div>
+                    )}
+                </div>
               );
             })}
           </div>
@@ -47,7 +80,7 @@ const Taskbar = ({ appsConfig }) => {
               <button onClick={togglePause} className="font-bold text-lg px-2">{isPaused ? '▶' : '❚❚'}</button>
               <div className="flex gap-1">
                 {speeds.map(s => (
-                  <button key={s.label} onClick={() => setGameSpeed(s.value)} className={`px-2 py-0.5 text-xs rounded ${gameSpeed === s.value ? 'bg-blue-600' : 'bg-gray-700'}`}>{s.label}</button>
+                  <button key={s.label} onClick={() => setGameSpeed(s.value)} className={`px-2 py-0.5 text-xs rounded ${gameSpeed === s.value ? 'bg-accent' : 'bg-gray-700'}`}>{s.label}</button>
                 ))}
               </div>
             </div>
@@ -58,5 +91,4 @@ const Taskbar = ({ appsConfig }) => {
 };
 
 export default Taskbar;
-
 

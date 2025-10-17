@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import useGameStore from '/src/store/gameStore.js';
-import { HARDWARE_CATALOG } from '/src/data.js';
+import useGameStore from '../store/gameStore.js';
+import { HARDWARE_CATALOG } from '../data.js';
 
 const OrderUp = () => {
     const purchaseAndStageItem = useGameStore(state => state.purchaseAndStageItem);
     const cash = useGameStore(state => state.state.finances.cash);
-    const inventory = useGameStore(state => state.state.inventory);
+    const inventory = useGameStore(state => state.state.inventory); // Keep for now to display old items
 
     const [quantities, setQuantities] = useState({});
 
@@ -16,7 +16,10 @@ const OrderUp = () => {
 
     const handlePurchase = (item) => {
         const quantity = quantities[item.id] || 1;
-        purchaseAndStageItem(item, quantity);
+        const totalCost = item.price * quantity;
+        if (cash >= totalCost) {
+            purchaseAndStageItem(item, quantity);
+        }
     };
 
     return (
@@ -45,7 +48,7 @@ const OrderUp = () => {
                     </ul>
                 </div>
                 <div className="bg-gray-900 p-3 rounded-md">
-                    <h3 className="font-bold text-lg mb-2">Inventory</h3>
+                    <h3 className="font-bold text-lg mb-2">Inventory (Legacy)</h3>
                     {Object.keys(inventory).length === 0 ? <p className="text-gray-500">Empty.</p> : (
                         <ul className="space-y-1">
                             {Object.entries(inventory).map(([itemId, count]) => {
@@ -59,6 +62,7 @@ const OrderUp = () => {
                             })}
                         </ul>
                     )}
+                     <p className="text-xs text-gray-400 mt-4">Note: Items are no longer added to inventory. New purchases are sent directly to the Tech Room.</p>
                 </div>
             </div>
         </div>

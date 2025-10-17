@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* Default to dark theme */
-:root {
+:root, .theme-blue {
   --color-bg-dark: #1a202c;
   --color-bg-light: #2d3748;
   --color-window-bg: #2d3748; /* Opaque background */
@@ -13,9 +13,10 @@
   --color-text-muted: #a0aec0;
   --color-border: #4a5568;
   --color-border-light: #718096;
+  --accent: #3b82f6; /* Blue */
 }
 
-.light {
+.light, .theme-light {
   --color-bg-dark: #f7fafc;
   --color-bg-light: #edf2f7;
   --color-window-bg: #ffffff; /* Opaque background */
@@ -27,7 +28,7 @@
   --color-border-light: #a0aec0;
 }
 
-.blue {
+.blue, .theme-dark-blue { /* Renamed for clarity */
   --color-bg-dark: #1a365d;
   --color-bg-light: #2a4365;
   --color-window-bg: #1a365d; /* Opaque background */
@@ -39,3 +40,8 @@
   --color-border-light: #4a5568;
 }
 
+/* New Accent Color Themes */
+.theme-green { --accent: #22c55e; }
+.theme-red { --accent: #ef4444; }
+.theme-purple { --accent: #8b5cf6; }
+.theme-orange { --accent: #f97316; }
