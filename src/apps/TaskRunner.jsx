@@ -5,8 +5,12 @@ import { TASK_DEFINITIONS, PRIORITIES, PRIORITY_COLORS } from '/src/data.js';
 const TaskCreator = ({ taskDef }) => {
     const createTask = useGameStore(state => state.createTask);
 
-    // --- THE FIX: Select from the nested 'state' object ---
-    const { employees, inventory, stagedHardware, dataCenterLayout, tasks } = useGameStore(state => state.state);
+    // --- THE FIX: Select each piece of state individually to prevent re-renders ---
+    const employees = useGameStore((s) => s.state.employees);
+    const inventory = useGameStore((s) => s.state.inventory);
+    const stagedHardware = useGameStore((s) => s.state.stagedHardware);
+    const dataCenterLayout = useGameStore((s) => s.state.dataCenterLayout);
+    const tasks = useGameStore((s) => s.state.tasks);
     
     const [priority, setPriority] = useState('Normal');
     const [selectedTarget, setSelectedTarget] = useState({ location: '', item: '', pdu: '' });
@@ -32,11 +36,11 @@ const TaskCreator = ({ taskDef }) => {
         let targets = [];
         switch (taskDef.needsTarget) {
             case 'RACK_UNPOWERED': {
-                const pdus = Object.values(dataCenterLayout).flatMap(r => r.contents).filter(c => c.type.includes('PDU')).map(p => p.id);
+                const pdus = Object.values(dataCenterLayout).flatMap(r => r.contents || []).filter(c => c.type.includes('PDU')).map(p => p.id);
                 if (pdus.length === 0) break;
                 targets = Object.keys(dataCenterLayout)
                     .filter(locId => dataCenterLayout[locId].type === 'RACK' && !dataCenterLayout[locId].pdu)
-                    .map(locId => ({ text: `Rack at ${locId}`, value: { location: locId, pdu: pdus[0] } })); // Default to first PDU
+                    .map(locId => ({ text: `Rack at ${locId}`, value: { location: locId, pdu: pdus[0] } }));
                 break;
             }
              case 'RACK':
@@ -135,7 +139,7 @@ const TaskCreator = ({ taskDef }) => {
 
 const TaskRunner = () => {
     const abortTask = useGameStore(state => state.abortTask);
-    // --- THE FIX: Select from the nested 'state' object ---
+    
     const tasks = useGameStore(state => state.state.tasks);
     const employees = useGameStore(state => state.state.employees);
     const time = useGameStore(state => state.state.time);
@@ -150,12 +154,22 @@ const TaskRunner = () => {
         return `${hours > 0 ? `${hours}h ` : ''}${minutes}m`; 
     };
     
+    // Memoize the list of available jobs so it doesn't re-render on every time change
+    const availableJobs = useMemo(() => (
+        <div className="mt-2 space-y-2">
+            {TASK_DEFINITIONS.map(taskDef => <TaskCreator key={taskDef.id} taskDef={taskDef} />)}
+        </div>
+    ), []);
+
     return ( 
         <div className="p-4 bg-gray-800 text-white h-full flex flex-col">
             <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">TaskRunner</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow min-h-0">
-                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Available Jobs</h3><div className="mt-2 space-y-2">{TASK_DEFINITIONS.map(taskDef => <TaskCreator key={taskDef.id} taskDef={taskDef} />)}</div></div>
-                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Task Queue</h3><div className="mt-2 space-y-2">{tasks.length === 0 ? <p className="text-gray-400">No tasks in queue.</p> : [...tasks].sort((a,b) => PRIORITIES[b.priority] - PRIORITIES[a.priority]).map(task => { const emp = task.assignedTo ? employees.find(e => e.id === task.assignedTo) : null; return (<div key={task.id} className="p-2 bg-gray-700 rounded-md text-sm"><div className="flex justify-between items-start"><div><strong>Task:</strong> {task.description}</div><span className={`px-2 py-0.5 text-xs rounded-full ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span></div><div>Status: {task.status}</div>{emp && <div>Assigned: {emp.name}</div>}{task.status === 'In Progress' && task.completionTime && <div>ETA: {formatETA(task.completionTime)}</div>}<button onClick={() => abortTask(task.id)} className="mt-2 text-xs bg-red-700 px-2 py-1 rounded hover:bg-red-600">Abort</button></div>);})}</div></div>
+                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto">
+                    <h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Available Jobs</h3>
+                    {availableJobs}
+                </div>
+                <div className="bg-gray-900 p-2 rounded-md overflow-y-auto"><h3 className="font-bold text-lg mb-2 sticky top-0 bg-gray-900 py-1">Task Queue</h3><div className="mt-2 space-y-2">{tasks.length === 0 ? <p className="text-gray-400">No tasks in queue.</p> : [...tasks].sort((a,b) => (PRIORITIES[b.priority] || 0) - (PRIORITIES[a.priority] || 0)).map(task => { const emp = task.assignedTo ? employees.find(e => e.id === task.assignedTo) : null; return (<div key={task.id} className="p-2 bg-gray-700 rounded-md text-sm"><div className="flex justify-between items-start"><div><strong>Task:</strong> {task.description}</div><span className={`px-2 py-0.5 text-xs rounded-full ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span></div><div>Status: {task.status}</div>{emp && <div>Assigned: {emp.name}</div>}{task.status === 'In Progress' && task.completionTime && <div>ETA: {formatETA(task.completionTime)}</div>}<button onClick={() => abortTask(task.id)} className="mt-2 text-xs bg-red-700 px-2 py-1 rounded hover:bg-red-600">Abort</button></div>);})}</div></div>
             </div>
         </div> 
     );

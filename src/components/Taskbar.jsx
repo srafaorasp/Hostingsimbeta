@@ -1,30 +1,17 @@
 import React from 'react';
 import useGameStore from '/src/store/gameStore.js';
-import { shallow } from 'zustand/shallow';
 
 const Taskbar = ({ appsConfig }) => {
-    // --- THE FIX: Select from the nested 'state' object ---
-    const { time, cash, isPaused, gameSpeed, openWindows, activeWindowId } = useGameStore(
-        (s) => ({
-            time: s.state.time,
-            cash: s.state.finances.cash,
-            isPaused: s.state.isPaused,
-            gameSpeed: s.state.gameSpeed,
-            openWindows: s.state.ui.windows,
-            activeWindowId: s.state.ui.activeWindowId,
-        }),
-        shallow
-    );
+    // --- THE FIX: Select state slices individually to prevent unnecessary re-renders ---
+    const time = useGameStore((s) => s.state.time);
+    const cash = useGameStore((s) => s.state.finances.cash);
+    const isPaused = useGameStore((s) => s.state.isPaused);
+    const gameSpeed = useGameStore((s) => s.state.gameSpeed);
+    const openWindows = useGameStore((s) => s.state.ui.windows);
+    const activeWindowId = useGameStore((s) => s.state.ui.activeWindowId);
     
-    const { togglePause, setGameSpeed, openApp, focusWindow } = useGameStore(
-        (s) => ({
-            togglePause: s.togglePause,
-            setGameSpeed: s.setGameSpeed,
-            openApp: s.openApp,
-            focusWindow: s.focusWindow,
-        }),
-        shallow
-    );
+    // Actions are static and can be retrieved once without causing re-renders.
+    const { togglePause, setGameSpeed, focusWindow } = useGameStore.getState();
     
     const speeds = [
         { label: '1x', value: 1 },
@@ -34,11 +21,7 @@ const Taskbar = ({ appsConfig }) => {
     ];
 
     const handleTaskbarClick = (id) => {
-        const win = openWindows[id];
-        if (win.isMinimized) {
-            // This needs to be an action from the store
-            // For now, we'll just focus it which should bring it up
-        }
+        // The logic here is simplified, but the key is to call the stable focusWindow function
         focusWindow(id);
     };
     

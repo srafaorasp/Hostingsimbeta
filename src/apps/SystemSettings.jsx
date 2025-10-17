@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import useGameStore from '/src/store/gameStore.js';
 
 const THEMES = [ { name: 'Dark', id: 'dark' }, { name: 'Light', id: 'light' }, { name: 'Blue', id: 'blue' } ];
@@ -6,14 +6,12 @@ const THEMES = [ { name: 'Dark', id: 'dark' }, { name: 'Light', id: 'light' }, {
 const SystemSettings = () => {
     const saveGame = useGameStore(state => state.saveGame);
     const setTheme = useGameStore(state => state.setTheme);
-    const setWallpaper = useGameStore(state => state.setWallpaper);
-    // --- THE FIX: Select from the nested 'state' object ---
+    // Wallpaper logic is now handled in App.jsx
     const theme = useGameStore(state => state.state.ui.desktopSettings.theme);
     const getFullState = () => useGameStore.getState().state;
 
     const [saveName, setSaveName] = useState('');
     const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
-    const fileInputRef = useRef(null);
 
     const handleSave = () => {
         if (!saveName) {
@@ -35,15 +33,6 @@ const SystemSettings = () => {
         a.download = `debug-dump-${new Date().toISOString()}.json`;
         a.click();
         URL.revokeObjectURL(url);
-    };
-
-    const handleWallpaperChange = (e) => {
-        const file = e.target.files[0];
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => setWallpaper(event.target.result);
-            reader.readAsDataURL(file);
-        }
     };
 
     return (
@@ -75,10 +64,9 @@ const SystemSettings = () => {
                     ))}
                 </div>
             </div>
-            <div className="bg-gray-900 p-3 rounded-md">
+             <div className="bg-gray-900 p-3 rounded-md">
                 <h3 className="font-bold text-lg mb-2">Desktop Wallpaper</h3>
-                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
-                <button onClick={() => fileInputRef.current.click()} className="bg-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-600">Upload Custom Wallpaper</button>
+                <p className="text-sm text-gray-400">You can now change the wallpaper by right-clicking on the desktop.</p>
             </div>
             <div className="bg-gray-900 p-3 rounded-md mt-auto">
                 <h3 className="font-bold text-lg mb-2 text-yellow-400">Debugging</h3>

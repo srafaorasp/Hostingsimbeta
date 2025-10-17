@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
+import useGameStore from '/src/store/gameStore.js';
 
 const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, onMinimize, onMaximize, onFocus, initialSize, initialPosition }) => {
+    const updateWindowState = useGameStore(state => state.updateWindowState);
     const [position, setPosition] = useState(initialPosition);
     const [size, setSize] = useState(initialSize);
     const [isDragging, setIsDragging] = useState(false);
@@ -27,7 +29,9 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
         document.removeEventListener('mouseup', handleDragEnd);
         document.removeEventListener('touchmove', handleDragMove);
         document.removeEventListener('touchend', handleDragEnd);
-    }, [handleDragMove]);
+        // Save final position to global state
+        updateWindowState(id, { position });
+    }, [handleDragMove, id, position, updateWindowState]);
 
     const handleDragStart = useCallback((e) => {
         if (isMaximized) return;
@@ -55,7 +59,9 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
         setIsResizing(false);
         document.removeEventListener('mousemove', handleResizeMove);
         document.removeEventListener('mouseup', handleResizeEnd);
-    }, [handleResizeMove]);
+        // Save final size to global state
+        updateWindowState(id, { size });
+    }, [handleResizeMove, id, size, updateWindowState]);
 
     const handleResizeStart = useCallback((e) => {
         onFocus(id);
@@ -72,9 +78,7 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
 
     return (
         <div
-            // --- THIS IS THE FIX for window flashing ---
-            // Removed the 'transition-all' class to prevent flashing on re-render.
-            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden duration-100 ease-out text-gray-200 ${isActive ? 'shadow-blue-500/50' : 'shadow-black/50'} ${windowClasses}`}
+            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden duration-100 ease-out text-gray-200 ${isActive ? 'shadow-lg shadow-blue-500/75' : 'shadow-black/50'} ${windowClasses}`}
             style={{
                 top: isMaximized ? 0 : position.y,
                 left: isMaximized ? 0 : position.x,
@@ -108,3 +112,4 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, o
 };
 
 export default Window;
+

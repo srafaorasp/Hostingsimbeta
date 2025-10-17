@@ -1,42 +1,99 @@
-import React, { Suspense, useEffect } from 'react';
-import useGameStore from '/src/store/gameStore.js';
-import useGameLoop from '/src/hooks/useGameLoop.js';
-import { APPS_CONFIG } from '/src/data.js';
+import React, { Suspense, useEffect, useRef } from 'react';
+import useGameStore from './store/gameStore.js';
+import useGameLoop from './hooks/useGameLoop.js';
+import { APPS_CONFIG } from './data.js';
+import { useDrop } from 'react-dnd';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from './components/ui/context-menu.jsx';
 import { shallow } from 'zustand/shallow';
 
-import LoginScreen from '/src/components/LoginScreen.jsx';
-import Window from '/src/components/Window.jsx';
-import Taskbar from '/src/components/Taskbar.jsx';
-import DesktopIcon from '/src/components/DesktopIcon.jsx';
-import Logo from '/src/components/Logo.jsx';
-import ToastContainer from '/src/components/Toast.jsx';
-import AlertContainer from '/src/components/Alert.jsx';
+import LoginScreen from './components/LoginScreen.jsx';
+import Window from './components/Window.jsx';
+import Taskbar from './components/Taskbar.jsx';
+import DesktopIcon from './components/DesktopIcon.jsx';
+import Logo from './components/Logo.jsx';
+import ToastContainer from './components/Toast.jsx';
+import AlertContainer from './components/Alert.jsx';
+
+
+const Desktop = () => {
+    // --- THIS IS THE FIX ---
+    // 1. Select reactive state with targeted hooks.
+    const desktopIcons = useGameStore(s => s.state.ui.desktopIcons, shallow);
+    
+    // 2. Get stable actions non-reactively.
+    const { openApp, updateIconPosition, setWallpaper } = useGameStore.getState();
+
+    const fileInputRef = useRef(null);
+
+    const handleWallpaperChange = (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => setWallpaper(event.target.result);
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const [, drop] = useDrop(() => ({
+        accept: 'desktop-icon',
+        drop: (item, monitor) => {
+            const delta = monitor.getDifferenceFromInitialOffset();
+            const icon = desktopIcons.find(i => i.appId === item.id);
+            if (!icon) return;
+            const left = Math.round(icon.position.x + delta.x);
+            const top = Math.round(icon.position.y + delta.y);
+            updateIconPosition(item.id, { x: left, y: top });
+        },
+    }), [desktopIcons]); // updateIconPosition is stable and not needed here
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger>
+                <div ref={drop} className="absolute inset-0 pt-20 pb-12 px-4">
+                    {desktopIcons.map(icon => (
+                        <DesktopIcon 
+                            key={icon.appId} 
+                            appId={icon.appId} 
+                            onIconClick={openApp} 
+                            appsConfig={APPS_CONFIG}
+                            position={icon.position}
+                        />
+                    ))}
+                </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+                <ContextMenuItem onSelect={() => fileInputRef.current.click()}>
+                    Change Wallpaper
+                </ContextMenuItem>
+            </ContextMenuContent>
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
+        </ContextMenu>
+    );
+};
+
 
 export default function App() {
-    // --- THE FIX: All state selectors now point to the nested 'state' object ---
-    const isBooted = useGameStore((s) => s.state.isBooted);
-    const wallpaper = useGameStore((s) => s.state.ui.desktopSettings.wallpaper);
-    const theme = useGameStore((s) => s.state.ui.desktopSettings.theme);
-    const windows = useGameStore((s) => s.state.ui.windows);
-    const activeWindowId = useGameStore((s) => s.state.ui.activeWindowId);
-    const toasts = useGameStore((s) => s.state.scripting.toasts);
-    const alerts = useGameStore((s) => s.state.scripting.alerts);
-    
-    // --- Action hooks are unchanged as actions are now top-level and stable ---
-    const { newGame, loadGame, openApp, closeWindow, minimizeWindow, maximizeWindow, focusWindow, removeToast, removeAlert } = useGameStore(
-        (state) => ({
-            newGame: state.newGame,
-            loadGame: state.loadGame,
-            openApp: state.openApp,
-            closeWindow: state.closeWindow,
-            minimizeWindow: state.minimizeWindow,
-            maximizeWindow: state.maximizeWindow,
-            focusWindow: state.focusWindow,
-            removeToast: state.removeToast,
-            removeAlert: state.removeAlert,
-        }),
-        shallow
-    );
+    // --- THIS IS THE FIX ---
+    // 1. Use targeted, granular hooks for each piece of state that needs to be reactive.
+    const isBooted = useGameStore(s => s.state.isBooted);
+    const theme = useGameStore(s => s.state.ui.desktopSettings.theme);
+    const wallpaper = useGameStore(s => s.state.ui.desktopSettings.wallpaper);
+    const windows = useGameStore(s => s.state.ui.windows, shallow);
+    const activeWindowId = useGameStore(s => s.state.ui.activeWindowId);
+    const toasts = useGameStore(s => s.state.scripting.toasts, shallow);
+    const alerts = useGameStore(s => s.state.scripting.alerts, shallow);
+
+    // 2. Get stable actions non-reactively from the store's state.
+    const {
+        loadGame,
+        newGame,
+        closeWindow,
+        minimizeWindow,
+        maximizeWindow,
+        focusWindow,
+        removeToast,
+        removeAlert,
+    } = useGameStore.getState();
 
     useGameLoop();
 
@@ -55,12 +112,7 @@ export default function App() {
 
     return (
         <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
-            {/* Desktop Area */}
-            <div className="absolute inset-0 pt-20 pb-12 px-4">
-                 <div className="flex flex-col flex-wrap h-full content-start gap-x-4 gap-y-2">
-                    {Object.keys(APPS_CONFIG).map(appId => <DesktopIcon key={appId} appId={appId} onIconClick={openApp} appsConfig={APPS_CONFIG} />)}
-                </div>
-            </div>
+            <Desktop />
 
             {/* OS Header */}
             <div className="absolute top-0 left-0 right-0 h-16 flex items-center p-4">

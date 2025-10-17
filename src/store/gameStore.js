@@ -3,43 +3,51 @@ import { produce } from 'immer';
 import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH } from '/src/data.js';
 
 // Helper function to create a fresh initial state
-const createInitialState = () => ({
-    time: new Date(2025, 8, 29, 8, 0, 0),
-    lastMonth: 8,
-    isPaused: true,
-    isBooted: false,
-    gameSpeed: 1,
-    finances: { cash: 75000, monthlyRevenue: 0, lastBill: 0 },
-    inventory: {},
-    stagedHardware: [],
-    employees: [],
-    tasks: [],
-    dataCenterLayout: {},
-    nextRackSlot: 1,
-    power: { capacity: 0, load: 0, gridActive: true, totalConsumedKwh: 0 },
-    cooling: { capacity: 0, load: 0 },
-    serverRoomTemp: 21.0,
-    network: { capacity: 0, load: 0, ispContract: null, publicIpBlock: null, assignedPublicIps: {} },
-    nextInternalIp: 10,
-    activeContracts: [],
-    eventLog: [{ id: Date.now(), time: new Date(), message: "System OS booted successfully." }],
-    ui: {
-        desktopSettings: {
-            theme: 'dark',
-            wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`
+const createInitialState = () => {
+    const initialIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
+        appId,
+        position: { x: 20, y: 20 + index * 90 },
+    }));
+
+    return {
+        time: new Date(2025, 8, 29, 8, 0, 0),
+        lastMonth: 8,
+        isPaused: true,
+        isBooted: false,
+        gameSpeed: 1,
+        finances: { cash: 75000, monthlyRevenue: 0, lastBill: 0 },
+        inventory: {}, // Inventory is now obsolete but kept for save game compatibility for now.
+        stagedHardware: [],
+        employees: [],
+        tasks: [],
+        dataCenterLayout: {},
+        nextRackSlot: 1,
+        power: { capacity: 0, load: 0, gridActive: true, totalConsumedKwh: 0 },
+        cooling: { capacity: 0, load: 0 },
+        serverRoomTemp: 21.0,
+        network: { capacity: 0, load: 0, ispContract: null, publicIpBlock: null, assignedPublicIps: {} },
+        nextInternalIp: 10,
+        activeContracts: [],
+        eventLog: [{ id: Date.now(), time: new Date(), message: "System OS booted successfully." }],
+        ui: {
+            desktopSettings: {
+                theme: 'dark',
+                wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`
+            },
+            desktopIcons: initialIcons,
+            windows: {},
+            activeWindowId: null,
+            nextZIndex: 10,
+            lastWindowId: 0,
         },
-        windows: {},
-        activeWindowId: null,
-        nextZIndex: 10,
-        lastWindowId: 0,
-    },
-    scripting: {
-        agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
-        scripts: {},
-        toasts: [],
-        alerts: [],
-    },
-});
+        scripting: {
+            agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
+            scripts: {},
+            toasts: [],
+            alerts: [],
+        },
+    }
+};
 
 
 // Helper function for deep merging states, crucial for loading games.
@@ -158,10 +166,35 @@ const useGameStore = create((set, get) => ({
         localStorage.setItem('datacenter_wallpaper', wallpaperUrl);
         set(produce(draft => { draft.state.ui.desktopSettings.wallpaper = wallpaperUrl; }));
     },
+    updateWindowState: (id, updates) => set(produce(draft => {
+        if (draft.state.ui.windows[id]) {
+            if (updates.position) draft.state.ui.windows[id].position = updates.position;
+            if (updates.size) draft.state.ui.windows[id].size = updates.size;
+        }
+    })),
+    updateIconPosition: (appId, position) => set(produce(draft => {
+        const icon = draft.state.ui.desktopIcons.find(icon => icon.appId === appId);
+        if (icon) {
+            icon.position = position;
+        }
+    })),
     
     // --- Finances ---
     spendCash: (amount) => set(produce(draft => { draft.state.finances.cash -= amount; })),
     addCash: (amount) => set(produce(draft => { draft.state.finances.cash += amount; })),
+    purchaseAndStageItem: (item, quantity) => set(produce(draft => {
+        const totalCost = item.price * quantity;
+        if (draft.state.finances.cash >= totalCost) {
+            draft.state.finances.cash -= totalCost;
+            for (let i = 0; i < quantity; i++) {
+                const stagedId = `${item.id}_${Date.now() + i}`;
+                draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
+            }
+            get().addEventLog(`Purchased and staged ${quantity} x ${item.name}.`, 'Commerce');
+        } else {
+            get().addEventLog(`Purchase failed. Not enough cash for ${quantity} x ${item.name}.`, 'Error');
+        }
+    })),
     processMonthlyBilling: () => set(produce(draft => {
         const { network, employees, power, time } = draft.state;
         const ispCost = network.ispContract ? network.ispContract.monthlyCost : 0;
@@ -178,6 +211,7 @@ const useGameStore = create((set, get) => ({
     })),
 
     // --- Inventory & Hardware ---
+    // addToInventory is no longer used for purchases, but kept for save game compatibility
     addToInventory: (item, count = 1) => set(produce(draft => {
         draft.state.inventory[item.id] = (draft.state.inventory[item.id] || 0) + count;
     })),

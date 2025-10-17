@@ -3,9 +3,7 @@ import useGameStore from '/src/store/gameStore.js';
 import { HARDWARE_CATALOG } from '/src/data.js';
 
 const OrderUp = () => {
-    const spendCash = useGameStore(state => state.spendCash);
-    const addToInventory = useGameStore(state => state.addToInventory);
-    // --- THE FIX: Select from the nested 'state' object ---
+    const purchaseAndStageItem = useGameStore(state => state.purchaseAndStageItem);
     const cash = useGameStore(state => state.state.finances.cash);
     const inventory = useGameStore(state => state.state.inventory);
 
@@ -18,11 +16,7 @@ const OrderUp = () => {
 
     const handlePurchase = (item) => {
         const quantity = quantities[item.id] || 1;
-        const totalCost = item.price * quantity;
-        if (cash >= totalCost) {
-            spendCash(totalCost);
-            addToInventory(item, quantity);
-        }
+        purchaseAndStageItem(item, quantity);
     };
 
     return (
@@ -72,3 +66,4 @@ const OrderUp = () => {
 };
 
 export default OrderUp;
+

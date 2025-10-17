@@ -71,15 +71,7 @@ export const SCRIPT_PERMISSIONS = {
 };
 
 export const TASK_DEFINITIONS = [
-    // Unboxing tasks
-    { id: 'unbox_rack', description: 'Unbox Server Rack', requiredSkill: 'Hardware Technician', requiredHardware: { 'rack_std_01': 1 }, durationMinutes: 30, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'rack_std_01' } },
-    { id: 'unbox_server', description: 'Unbox Blade Server', requiredSkill: 'Hardware Technician', requiredHardware: { 'server_blade_g1': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'server_blade_g1' } },
-    { id: 'unbox_switch', description: 'Unbox Network Switch', requiredSkill: 'Hardware Technician', requiredHardware: { 'switch_48p': 1 }, durationMinutes: 15, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'switch_48p' } },
-    { id: 'unbox_pdu', description: 'Unbox PDU', requiredSkill: 'Hardware Technician', requiredHardware: { 'pdu_basic_3kw': 1 }, durationMinutes: 10, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'pdu_basic_3kw' } },
-    { id: 'unbox_crac', description: 'Unbox CRAC', requiredSkill: 'Hardware Technician', requiredHardware: { 'crac_10k_btu': 1 }, durationMinutes: 45, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'crac_10k_btu' } },
-    { id: 'unbox_router', description: 'Unbox Enterprise Router', requiredSkill: 'Hardware Technician', requiredHardware: { 'router_enterprise_01': 1 }, durationMinutes: 20, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'router_enterprise_01' } },
-    { id: 'unbox_fiber_terminal', description: 'Unbox Fiber Terminal', requiredSkill: 'Hardware Technician', requiredHardware: { 'fiber_terminal_sfp': 1 }, durationMinutes: 10, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'fiber_terminal_sfp' } },
-    { id: 'unbox_generator', description: 'Unbox Diesel Generator', requiredSkill: 'Hardware Technician', requiredHardware: { 'generator_diesel_50kw': 1 }, durationMinutes: 60, location: 'Tech Room', onCompleteEffect: { action: 'STAGE_HARDWARE', item: 'generator_diesel_50kw' } },
+    // Unboxing tasks REMOVED
 
     // Installation tasks
     { id: 'install_rack', description: 'Install Server Rack', requiredSkill: 'Hardware Technician', durationMinutes: 120, location: 'Server Room', needsStaged: 'rack_std_01', onCompleteEffect: { action: 'INSTALL_HARDWARE' } },
