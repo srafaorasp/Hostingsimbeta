@@ -1,101 +1,91 @@
-import React, { useState, useRef, useEffect } from "react";
-import useGameStore from "../store/gameStore";
-import { scriptingEngine } from "../game/scriptingEngine";
+import React, { useState, useEffect, useRef } from 'react';
+import useGameStore from '/src/store/gameStore.js';
+import { executeCommand } from '/src/game/scriptingEngine.js';
 
 const Shell = () => {
-  const [input, setInput] = useState("");
-  const [history, setHistory] = useState([]);
-  const addLog = useGameStore((state) => state.addLog);
-  const endOfHistoryRef = useRef(null);
+    const [history, setHistory] = useState(['DataCenter OS [Version 1.0.0]', '(c) 2025 DataCenter Corp. All rights reserved.', '']);
+    const [input, setInput] = useState('');
+    const [commandHistory, setCommandHistory] = useState([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+    const endOfHistoryRef = useRef(null);
 
-  const scrollToBottom = () => {
-    endOfHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+    const scrollToBottom = () => {
+        endOfHistoryRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [history]);
+    useEffect(scrollToBottom, [history]);
 
-  const handleCommand = (command) => {
-    const [cmd, ...args] = command.trim().split(" ");
-    const output = { command, result: "" };
+    const handleInputChange = (e) => {
+        setInput(e.target.value);
+    };
 
-    const getState = useGameStore.getState;
-
-    switch (cmd) {
-      case "help":
-        output.result =
-          "Available commands: help, clear, ls, run <script_name>";
-        break;
-      case "clear":
-        setHistory([]);
-        return; // Skip adding to history
-      case "ls":
-        output.result = `Scripts: ${getState()
-          .scripts.map((s) => s.name)
-          .join(", ")}`;
-        break;
-      case "run":
-        const scriptName = args[0];
-        const script = getState().scripts.find((s) => s.name === scriptName);
-        if (script) {
-          const result = scriptingEngine.run(script.code, [], getState);
-          output.result = `Script '${scriptName}' executed. Result: ${result}`;
-        } else {
-          output.result = `Error: Script '${scriptName}' not found.`;
+    const handleCommandSubmit = async () => {
+        const command = input.trim();
+        if (command === '') {
+            setHistory(prev => [...prev, `> `]);
+            setInput('');
+            return;
         }
-        break;
-      default:
-        output.result = `Command not found: ${cmd}`;
-        break;
-    }
-    addLog({ source: "Shell", message: output.result });
-    setHistory((prev) => [...prev, output]);
-  };
 
-  const handleInputChange = (e) => {
-    setInput(e.target.value);
-  };
+        const newCommandHistory = [command, ...commandHistory];
+        setCommandHistory(newCommandHistory);
+        setHistoryIndex(-1);
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleCommand(input);
-      setInput("");
-    }
-  };
+        let output;
+        if (command.toLowerCase() === 'clear') {
+            setHistory([]);
+            setInput('');
+            return;
+        } else {
+            output = await executeCommand(command, 'player', 'shell');
+        }
 
-  return (
-    <div className="bg-black text-green-400 font-mono text-sm h-full flex flex-col p-2">
-      <div className="overflow-y-auto flex-grow">
-        <p>Hosting Simulator Shell [Version 1.0.0]</p>
-        <p>(c) 2025 SimuCorp. All rights reserved.</p>
-        <br />
-        {history.map((line, index) => (
-          <div key={index}>
-            <p>
-              <span className="text-cyan-400">user@host</span>
-              <span className="text-white">:~$</span> {line.command}
-            </p>
-            <p className="text-white">{line.result}</p>
-          </div>
-        ))}
-        <div ref={endOfHistoryRef} />
-      </div>
-      <div className="flex">
-        <span className="text-cyan-400">user@host</span>
-        <span className="text-white">:~$</span>
-        <input
-          type="text"
-          value={input}
-          onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
-          className="bg-transparent border-none text-green-400 focus:outline-none flex-grow ml-2"
-          autoFocus
-        />
-      </div>
-    </div>
-  );
+        setHistory(prev => [...prev, `> ${command}`, ...output.split('\n')]);
+        setInput('');
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleCommandSubmit();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length - 1) {
+                const newIndex = historyIndex + 1;
+                setHistoryIndex(newIndex);
+                setInput(commandHistory[newIndex]);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+                const newIndex = historyIndex - 1;
+                setHistoryIndex(newIndex);
+                setInput(commandHistory[newIndex]);
+            } else {
+                setHistoryIndex(-1);
+                setInput('');
+            }
+        }
+    };
+
+    return (
+        <div className="p-2 bg-black text-green-400 h-full font-mono text-sm overflow-y-auto" onClick={() => endOfHistoryRef.current?.focus()}>
+            {history.map((line, index) => (
+                <p key={index} className="whitespace-pre-wrap">{line}</p>
+            ))}
+            <div className="flex">
+                <span className="mr-2">&gt;</span>
+                <input
+                    ref={endOfHistoryRef}
+                    type="text"
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    className="bg-transparent border-none text-green-400 w-full focus:outline-none"
+                    autoFocus
+                />
+            </div>
+        </div>
+    );
 };
 
 export default Shell;
-

@@ -6,7 +6,10 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
     const { closeWindow, minimizeWindow, maximizeWindow, focusWindow, updateWindowState } = useGameStore.getState();
     const dragControls = useDragControls();
 
+    // --- DEFINITIVE FIX for Window Snapping ---
     const handleDragEnd = (event, info) => {
+        // We calculate the new position by adding the final drag offset to the window's starting position.
+        // This provides a stable and correct final position.
         const newPosition = {
             x: position.x + info.offset.x,
             y: position.y + info.offset.y,
@@ -14,6 +17,7 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
         updateWindowState(id, { position: newPosition });
     };
 
+    // --- DEFINITIVE FIX for Resizing Logic ---
     const resizeStartRef = useRef(null);
 
     const handleResizeMove = useCallback((e) => {
@@ -28,11 +32,13 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
         let newX = startPosition.x;
         let newY = startPosition.y;
 
+        // Apply size changes
         if (direction.includes('right')) newWidth = Math.max(300, startSize.width + dx);
         if (direction.includes('bottom')) newHeight = Math.max(200, startSize.height + dy);
         if (direction.includes('left')) newWidth = Math.max(300, startSize.width - dx);
         if (direction.includes('top')) newHeight = Math.max(200, startSize.height - dy);
 
+        // Apply position changes for left/top drags
         if (direction.includes('left') && newWidth > 300) newX = startPosition.x + dx;
         if (direction.includes('top') && newHeight > 200) newY = startPosition.y + dy;
 
@@ -86,20 +92,20 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
             className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden text-gray-200 ${isActive ? 'shadow-accent/50' : 'shadow-black/50'} ${isMaximized ? 'rounded-none' : 'rounded-lg'}`}
             style={{ 
                 zIndex,
-                // We must use `top` and `left` for initial positioning when not using transforms.
-                // Framer-motion's `drag` will apply transforms on top of this.
-                top: 0,
-                left: 0,
+                // We now exclusively use transforms for positioning
+                x: position.x,
+                y: position.y,
+                width: size.width,
+                height: size.height,
             }}
-            initial={{ opacity: 0, scale: 0.9, x: position.x, y: position.y }}
             animate={{
-                opacity: 1,
-                scale: 1,
                 width: isMaximized ? '100%' : size.width,
                 height: isMaximized ? `calc(100vh - 7rem)` : size.height,
                 x: isMaximized ? 0 : position.x,
                 y: isMaximized ? 0 : position.y,
             }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.1, ease: "easeOut" }}
             drag={!isMaximized}
             dragListener={false}
@@ -109,7 +115,6 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
         >
             <header
                 onPointerDown={(event) => {
-                    // Only start drag from the header bar itself, not buttons
                     if (event.target === event.currentTarget) {
                         dragControls.start(event);
                     }
