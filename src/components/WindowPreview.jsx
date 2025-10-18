@@ -1,41 +1,23 @@
-import React, { Suspense } from 'react';
-import { APPS_CONFIG } from '../data';
+import React from "react";
+import { APPS_CONFIG } from "../data";
 
-const WindowPreview = ({ window }) => {
-    if (!window || !window.appId) return null;
-    
-    const AppToRender = APPS_CONFIG[window.appId]?.component;
-    if (!AppToRender) return null;
+const WindowPreview = ({ appId }) => {
+  const App = APPS_CONFIG[appId]?.component;
+  const appConfig = APPS_CONFIG[appId];
 
-    // This is an estimation. A more robust solution might need to pass the actual size.
-    const originalWidth = window.size?.width || 800;
-    const originalHeight = window.size?.height || 600;
-    
-    const previewWidth = 192; // w-48
-    const previewHeight = 144; // h-36
+  if (!App || !appConfig) {
+    return <div className="p-4">Error: App not found</div>;
+  }
 
-    const scaleX = previewWidth / originalWidth;
-    const scaleY = previewHeight / originalHeight;
-    const scale = Math.min(scaleX, scaleY);
-
-    return (
-        <div 
-            className="w-48 h-36 bg-window-bg border-2 border-accent rounded-md overflow-hidden pointer-events-none shadow-lg"
-        >
-            <div 
-                style={{ 
-                    width: originalWidth, 
-                    height: originalHeight,
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                }}
-            >
-                <Suspense fallback={<div className="text-white">Loading...</div>}>
-                    <AppToRender />
-                </Suspense>
-            </div>
-        </div>
-    );
+  // A simple preview - just show the icon and name
+  return (
+    <div className="bg-gray-800 text-white w-full h-full p-1 rounded-md overflow-hidden flex items-center justify-center">
+      <div className="text-center">
+        <appConfig.icon className="mx-auto h-12 w-12 text-gray-500" />
+        <p className="mt-2 text-sm font-semibold">{appConfig.name}</p>
+      </div>
+    </div>
+  );
 };
 
 export default WindowPreview;
