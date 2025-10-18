@@ -1,70 +1,49 @@
-import React, { useRef } from 'react';
-import { motion, useMotionValue } from 'framer-motion';
+import React, { useState, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import useGameStore from '/src/store/gameStore.js';
 
-const Window = ({ id, title, children, zIndex, isActive, isMaximized, initialSize, initialPosition }) => {
+const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, size }) => {
+    // Non-reactive actions from the store
     const { closeWindow, minimizeWindow, maximizeWindow, focusWindow, updateWindowState } = useGameStore.getState();
+    
+    // Local state for resizing only
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0 });
+    const constraintsRef = useRef(null);
 
-    // Use MotionValues to track position without causing re-renders on drag
-    const x = useMotionValue(initialPosition.x);
-    const y = useMotionValue(initialPosition.y);
+    const windowClasses = isMaximized ? 'top-0 left-0 w-full h-full rounded-none' : 'rounded-lg';
 
+    // --- THIS IS THE FIX for resizing ---
+    const handleResizeMove = useCallback((e) => {
+        const newWidth = resizeStartPos.current.width + (e.clientX - resizeStartPos.current.x);
+        const newHeight = resizeStartPos.current.height + (e.clientY - resizeStartPos.current.y);
+        // Directly update the global state during resize
+        updateWindowState(id, { size: { width: Math.max(300, newWidth), height: Math.max(200, newHeight) } });
+    }, [id, updateWindowState]);
+
+    const handleResizeEnd = useCallback(() => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+    }, [handleResizeMove]);
+
+    const handleResizeStart = useCallback((e) => {
+        e.stopPropagation(); // Prevent drag from firing
+        focusWindow(id);
+        setIsResizing(true);
+        resizeStartPos.current = { x: e.clientX, y: e.clientY, width: size.width, height: size.height };
+        document.addEventListener('mousemove', handleResizeMove);
+        document.addEventListener('mouseup', handleResizeEnd);
+    }, [id, focusWindow, size, handleResizeMove, handleResizeEnd]);
+
+    // --- THIS IS THE FIX for dragging ---
     const handleDragEnd = (event, info) => {
-        // After dragging, update the global state with the new position.
-        updateWindowState(id, { position: { x: info.point.x, y: info.point.y } });
+        updateWindowState(id, { position: { x: info.offset.x, y: info.offset.y } });
     };
 
-    const headerRef = useRef(null);
-
     return (
-        <motion.div
-            drag
-            dragListener={false} // We will use a specific drag handle
-            dragMomentum={false}
-            onDragEnd={handleDragEnd}
-            style={{ x, y }} // Bind the position to motion values
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ 
-                opacity: 1, 
-                scale: 1,
-                width: isMaximized ? '100%' : initialSize.width,
-                height: isMaximized ? 'calc(100vh - 3rem)' : initialSize.height,
-                x: isMaximized ? 0 : x.get(),
-                y: isMaximized ? 0 : y.get(),
-            }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden text-gray-200 rounded-lg ${isActive ? 'shadow-lg shadow-blue-500/75' : 'shadow-black/50'}`}
-            style={{
-                zIndex: zIndex,
-                width: initialSize.width,
-                height: initialSize.height,
-            }}
-            onMouseDown={() => focusWindow(id)}
-        >
-            <header
-                ref={headerRef}
-                onPointerDown={(e) => {
-                    // This allows dragging only via the header
-                    const { dragControls } = e;
-                    if (dragControls) {
-                        dragControls.start(e);
-                    }
-                }}
-                className={`bg-gray-900 text-white p-2 flex justify-between items-center cursor-grab active:cursor-grabbing ${isActive ? 'bg-blue-800' : ''}`}
-            >
-                <span className="font-bold text-sm select-none">{title}</span>
-                <div className="flex items-center space-x-2">
-                    <button onClick={(e) => { e.stopPropagation(); minimizeWindow(id); }} className="w-4 h-4 bg-yellow-500 rounded-full hover:bg-yellow-400"></button>
-                    <button onClick={(e) => { e.stopPropagation(); maximizeWindow(id); }} className="w-4 h-4 bg-green-500 rounded-full hover:bg-green-400"></button>
-                    <button onClick={(e) => { e.stopPropagation(); closeWindow(id); }} className="w-4 h-4 bg-red-500 rounded-full hover:bg-red-400"></button>
-                </div>
-            </header>
-            <main className="flex-grow overflow-y-auto p-1 bg-gray-800/80 backdrop-blur-sm">
-                {children}
-            </main>
-            {/* Resizing handle can be added back here if needed, but requires more complex logic with framer-motion */}
-        </motion.div>
+        // Set the constraints ref to the viewport
+        <div ref={constraintsRef} className="absolute inset-0 pointer-events-none" />
     );
 };
 

@@ -18,11 +18,9 @@ import BSOD from '/src/components/BSOD.jsx';
 
 
 const Desktop = () => {
-    const { openApp, updateIconPosition } = useGameStore.getState();
+    const { openApp, updateIconPosition, setWallpaper } = useGameStore.getState();
     const desktopIcons = useGameStore(s => s.state.ui.desktopIcons || [], shallow);
-
     const fileInputRef = useRef(null);
-    const { setWallpaper } = useGameStore.getState();
 
     const [, drop] = useDrop(() => ({
         accept: 'icon',
@@ -31,13 +29,17 @@ const Desktop = () => {
             const left = Math.round(item.position.x + delta.x);
             const top = Math.round(item.position.y + delta.y);
             updateIconPosition(item.appId, { x: left, y: top });
+            return undefined; // react-dnd requires a return value
         },
     }), [updateIconPosition]);
 
     return (
         <ContextMenu>
             <ContextMenuTrigger>
-                <div ref={drop} className="absolute inset-0 h-full w-full">
+                {/* --- THIS IS THE FIX --- */}
+                {/* This div is now a clean, relative container that correctly defines the desktop area */}
+                {/* All conflicting flexbox classes have been removed */}
+                <div ref={drop} className="relative h-full w-full">
                     {desktopIcons.map(iconConfig => {
                         if (!iconConfig) return null;
                         return (
@@ -89,8 +91,6 @@ export default function App() {
     }
 
     if (!isBooted) {
-        // --- THIS IS THE FIX ---
-        // Pass both functions down to the LoginScreen component.
         return <LoginScreen onNewGame={newGame} onLoadGame={loadGame} />;
     }
     
@@ -99,6 +99,7 @@ export default function App() {
     return (
         <ErrorBoundary>
             <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
+                {/* This container correctly defines the space for the Desktop component */}
                 <div className={`absolute inset-0 ${desktopPadding} px-4`}>
                      <Desktop />
                 </div>
@@ -116,7 +117,7 @@ export default function App() {
                             const AppToRender = APPS_CONFIG[win.appId]?.component;
                             if (!AppToRender) return null; 
                             return (
-                                <Window key={win.id} id={win.id} title={win.title} zIndex={win.zIndex} isActive={activeWindowId === win.id} isMaximized={win.isMaximized} initialPosition={win.position} initialSize={win.size}>
+                                <Window key={win.id} id={win.id} title={win.title} zIndex={win.zIndex} isActive={activeWindowId === win.id} isMaximized={win.isMaximized} position={win.position} size={win.size}>
                                     <AppToRender />
                                 </Window>
                             );
