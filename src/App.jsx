@@ -18,25 +18,11 @@ import BSOD from '/src/components/BSOD.jsx';
 
 
 const Desktop = () => {
-    const { openApp, updateIconPosition, addEventLog } = useGameStore.getState();
-    // --- THIS IS A FIX ---
-    // Safely access desktopIcons and provide a default empty array
-    const desktopIcons = useGameStore(s => s.state.ui?.desktopIcons || [], shallow);
+    const { openApp, updateIconPosition } = useGameStore.getState();
+    const desktopIcons = useGameStore(s => s.state.ui.desktopIcons || [], shallow);
 
     const fileInputRef = useRef(null);
     const { setWallpaper } = useGameStore.getState();
-
-    const handleWallpaperChange = (e) => {
-        const file = e.target.files[0];
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setWallpaper(event.target.result);
-                addEventLog('Wallpaper changed.', 'Player', 'PLAYER');
-            };
-            reader.readAsDataURL(file);
-        }
-    };
 
     const [, drop] = useDrop(() => ({
         accept: 'icon',
@@ -52,79 +38,74 @@ const Desktop = () => {
         <ContextMenu>
             <ContextMenuTrigger>
                 <div ref={drop} className="absolute inset-0 h-full w-full">
-                     <div className="flex flex-col flex-wrap h-full content-start gap-x-1 gap-y-1 p-2">
-                        {Object.keys(APPS_CONFIG).map(appId => {
-                            return <DesktopIcon key={appId} appId={appId} onIconClick={() => openApp(appId)} appsConfig={APPS_CONFIG} />
-                        })}
-                    </div>
+                    {desktopIcons.map(iconConfig => {
+                        if (!iconConfig) return null;
+                        return (
+                            <DesktopIcon
+                                key={iconConfig.appId}
+                                appId={iconConfig.appId}
+                                onIconClick={openApp}
+                                appsConfig={APPS_CONFIG}
+                                position={iconConfig.position}
+                            />
+                        );
+                    })}
                 </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem onClick={() => fileInputRef.current.click()}>
+                <ContextMenuItem onClick={() => fileInputRef.current && fileInputRef.current.click()}>
                     Change Wallpaper
                 </ContextMenuItem>
             </ContextMenuContent>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
+            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => setWallpaper(`url(${event.target.result})`);
+                    reader.readAsDataURL(file);
+                }
+            }} />
         </ContextMenu>
     );
 };
 
 export default function App() {
+    useGameLoop();
     const { newGame, loadGame } = useGameStore.getState();
+
     const isBooted = useGameStore(s => s.state.isBooted);
     const hasCrashed = useGameStore(s => s.state.hasCrashed);
-
-    const { wallpaper, theme, accentColor, taskbarPosition } = useGameStore(
-        s => s.state.ui?.desktopSettings || { wallpaper: '', theme: 'dark', accentColor: 'blue', taskbarPosition: 'bottom' },
-        shallow
-    );
-    
-    const { windows, activeWindowId, toasts, alerts } = useGameStore(
-        s => ({
-            windows: s.state.ui?.windows || {},
-            activeWindowId: s.state.ui?.activeWindowId || null,
-            toasts: s.state.scripting?.toasts || [],
-            alerts: s.state.scripting?.alerts || [],
-        }),
-        shallow
-    );
-
-    const { closeWindow, minimizeWindow, maximizeWindow, focusWindow, removeToast, removeAlert } = useGameStore.getState();
-
-    useGameLoop();
+    const uiState = useGameStore(s => s.state.ui || {}, shallow);
+    const { windows = {}, activeWindowId, toasts = [], alerts = [] } = uiState;
+    const { theme, accentColor, wallpaper, taskbarPosition } = uiState.desktopSettings || {};
 
     useEffect(() => {
-        document.documentElement.className = `${theme} theme-${accentColor}`;
+        document.documentElement.className = theme;
+        document.documentElement.style.setProperty('--accent-color', `hsl(var(--accent-${accentColor}))`);
     }, [theme, accentColor]);
 
-    const handleLogin = (slotName) => {
-        if (slotName) loadGame(slotName);
-        else newGame();
-    };
-    
     if (hasCrashed) {
         return <BSOD />;
     }
 
     if (!isBooted) {
-        return <LoginScreen onLogin={handleLogin} />;
+        // --- THIS IS THE FIX ---
+        // Pass both functions down to the LoginScreen component.
+        return <LoginScreen onNewGame={newGame} onLoadGame={loadGame} />;
     }
-
-    const desktopPadding = taskbarPosition === 'top' ? 'pt-12 pb-4' : 'pt-4 pb-12';
+    
+    const desktopPadding = taskbarPosition === 'top' ? 'pt-16 pb-12' : 'pt-8 pb-20';
 
     return (
-        <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500 bg-bg-dark" style={{ backgroundImage: wallpaper }}>
-             <ErrorBoundary>
-                {/* Desktop Area */}
-                <div className={`absolute inset-0 px-2 ${desktopPadding}`}>
-                    <Desktop />
+        <ErrorBoundary>
+            <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
+                <div className={`absolute inset-0 ${desktopPadding} px-4`}>
+                     <Desktop />
                 </div>
-
-                {/* OS Header */}
-                <div className="absolute top-0 left-0 right-0 h-10 flex items-center p-4">
-                    <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm p-2 rounded-lg">
+                <div className="absolute top-0 left-0 right-0 h-16 flex items-center p-4 pointer-events-none">
+                     <div className="flex items-center gap-3 bg-black/30 backdrop-blur-sm p-2 rounded-lg">
                         <Logo />
-                        <h1 className="text-xl font-bold text-white tracking-wider">DataCenter OS</h1>
+                        <h1 className="text-2xl font-bold text-white tracking-wider">DataCenter OS</h1>
                     </div>
                 </div>
                 
@@ -135,7 +116,7 @@ export default function App() {
                             const AppToRender = APPS_CONFIG[win.appId]?.component;
                             if (!AppToRender) return null; 
                             return (
-                                <Window key={win.id} id={win.id} title={win.title} zIndex={win.zIndex} isActive={activeWindowId === win.id} isMaximized={win.isMaximized} onClose={closeWindow} onMinimize={minimizeWindow} onMaximize={maximizeWindow} onFocus={focusWindow} initialPosition={win.position} initialSize={win.size}>
+                                <Window key={win.id} id={win.id} title={win.title} zIndex={win.zIndex} isActive={activeWindowId === win.id} isMaximized={win.isMaximized} initialPosition={win.position} initialSize={win.size}>
                                     <AppToRender />
                                 </Window>
                             );
@@ -144,10 +125,10 @@ export default function App() {
                 </Suspense>
 
                 <Taskbar appsConfig={APPS_CONFIG} />
-                <ToastContainer toasts={toasts} onDismiss={removeToast} />
-                <AlertContainer alerts={alerts} onDismiss={removeAlert} />
-            </ErrorBoundary>
-        </div>
+                <ToastContainer toasts={toasts} />
+                <AlertContainer alerts={alerts} />
+            </div>
+        </ErrorBoundary>
     );
 }
 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-const LoginScreen = ({ onLogin }) => { // Changed from onLoginSuccess to onLogin
+// --- THIS IS THE FIX ---
+// The component now accepts two specific props, `onNewGame` and `onLoadGame`.
+const LoginScreen = ({ onNewGame, onLoadGame }) => {
     const [savedGames, setSavedGames] = useState([]);
     const [scanComplete, setScanComplete] = useState(false);
 
     useEffect(() => {
-        // Simulate a security scan on boot
         const timer = setTimeout(() => {
             const saves = Object.keys(localStorage)
                 .filter(key => key.startsWith('datacenter_save_'))
@@ -32,7 +33,7 @@ const LoginScreen = ({ onLogin }) => { // Changed from onLoginSuccess to onLogin
                 ) : (
                     <div>
                         <button
-                            onClick={() => onLogin(null)} // Changed from onLoginSuccess
+                            onClick={() => onNewGame()} // This button now correctly calls the `onNewGame` function.
                             className="w-full bg-green-400 text-gray-900 font-bold py-3 px-4 rounded hover:bg-green-300 transition-colors duration-200"
                         >
                             Start New Session
@@ -45,7 +46,7 @@ const LoginScreen = ({ onLogin }) => { // Changed from onLoginSuccess to onLogin
                                     {savedGames.map(slot => (
                                         <li key={slot}>
                                             <button
-                                                onClick={() => onLogin(slot)} // Changed from onLoginSuccess
+                                                onClick={() => onLoadGame(slot)} // This button now correctly calls the `onLoadGame` function.
                                                 className="w-full text-left bg-gray-800/50 p-2 rounded hover:bg-green-400/20"
                                             >
                                                 {slot}

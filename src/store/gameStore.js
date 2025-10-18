@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
-import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH, TASK_DEFINITIONS, ACHIEVEMENT_DEFINITIONS } from '../data.js';
-import { playSound } from '../game/soundManager.js';
+import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH, ACHIEVEMENT_DEFINITIONS } from '../data.js';
 
 // Helper function to create a fresh initial state
 const createInitialState = () => ({
@@ -9,11 +8,11 @@ const createInitialState = () => ({
     lastMonth: 8,
     isPaused: true,
     isBooted: false,
-    gameSpeed: 1,
     hasCrashed: false,
-    finances: { 
-        cash: 75000, 
-        monthlyRevenue: 0, 
+    gameSpeed: 1,
+    finances: {
+        cash: 75000,
+        monthlyRevenue: 0,
         lastBill: 0,
     },
     history: {
@@ -38,7 +37,7 @@ const createInitialState = () => ({
             theme: 'dark',
             accentColor: 'blue',
             taskbarPosition: 'bottom',
-            wallpaper: `url('https://placehold.co/1920x1080/0a1829/1c2a3b?text=DataCenter+OS')`
+            wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`
         },
         windows: {},
         activeWindowId: null,
@@ -51,7 +50,15 @@ const createInitialState = () => ({
     },
     scripting: {
         agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
-        fileSystem: {},
+        fileSystem: {
+            '/home/system/example.js': {
+                content: '# Welcome to the ScriptIDE!\n# Use this file to automate tasks.\n\n# Example: Send a notification\nplayer notify "Hello World" "This is a test notification from a script."',
+                agentName: 'system',
+                status: 'paused',
+                interval: 60,
+                lastRunTime: null,
+            }
+        },
         daemons: {},
         toasts: [],
         alerts: [],
@@ -60,15 +67,6 @@ const createInitialState = () => ({
         isActive: true,
         step: 0,
         targetElement: null,
-        steps: [
-            { text: "Welcome to DataCenter OS. First, let's hire a technician to help us. Open the TeamView app.", trigger: { action: 'openApp', appId: 'TeamView' }, target: 'icon-TeamView' },
-            { text: "Great. Now hire Alex Chen. You'll need him for hardware tasks.", trigger: { action: 'hireEmployee', employeeId: 'emp_001' }, target: null },
-            { text: "Next, we need a server rack. Open the OrderUp app to buy one.", trigger: { action: 'openApp', appId: 'OrderUp' }, target: 'icon-OrderUp' },
-            { text: "Purchase a 'Standard Server Rack'.", trigger: { action: 'purchaseItem', itemId: 'rack_std_01' }, target: null },
-            { text: "Good. Now, open TaskRunner to manage jobs.", trigger: { action: 'openApp', appId: 'TaskRunner' }, target: 'icon-TaskRunner' },
-            { text: "Finally, schedule the 'Install Server Rack' task. Your technician will take it from there.", trigger: { action: 'createTask', taskId: 'install_rack' }, target: null },
-            { text: "You're all set! The tutorial is complete. Good luck.", trigger: { action: 'end' }, target: null },
-        ]
     },
     achievements: {
         unlocked: [],
@@ -79,12 +77,15 @@ const createInitialState = () => ({
 // Helper function for deep merging states, crucial for loading games.
 const deepMerge = (target, source) => {
     for (const key in source) {
-        if (source.hasOwnProperty(key)) {
-            if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
-                deepMerge(target[key], source[key]);
+        if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
+            // Special handling for arrays to avoid merging, we want to replace them
+            if (Array.isArray(source[key])) {
+                 target[key] = source[key];
             } else {
-                target[key] = source[key];
+                deepMerge(target[key], source[key]);
             }
+        } else {
+            target[key] = source[key];
         }
     }
     return target;
@@ -92,52 +93,44 @@ const deepMerge = (target, source) => {
 
 
 const useGameStore = create((set, get) => ({
-    // All state is nested under a 'state' property
     state: createInitialState(),
 
     // --- System & Time ---
     newGame: () => {
-        playSound('ui_click');
-        set({ state: { ...createInitialState(), isBooted: true, tutorial: { ...createInitialState().tutorial, isActive: true }, eventLog: [{ id: Date.now(), time: new Date(), source: 'System', level: 'PLAYER', message: "New session started." }] } });
+        get().addEventLog('Starting new game session.', 'PLAYER');
+        set({ state: { ...createInitialState(), isBooted: true, eventLog: [{ id: Date.now(), time: new Date(), source: 'System', level: 'INFO', message: "New session started." }] } });
     },
     saveGame: (slotName) => {
-        const dataToSave = get().state; 
+        get().addEventLog(`Game saved to slot: ${slotName}`, 'PLAYER');
+        const dataToSave = get().state;
         const stateString = JSON.stringify({ ...dataToSave, time: dataToSave.time.toISOString(), eventLog: dataToSave.eventLog.map(e => ({ ...e, time: e.time.toISOString() })) });
-        localStorage.setItem(`datacenter_save_${slotName}`);
-        get().addEventLog(`Session saved as "${slotName}".`, 'System', 'PLAYER');
+        localStorage.setItem(`datacenter_save_${slotName}`, stateString);
     },
     loadGame: (slotName) => {
-        playSound('ui_click');
         const savedStateJSON = localStorage.getItem(`datacenter_save_${slotName}`);
         if (savedStateJSON) {
+            get().addEventLog(`Loading game from slot: ${slotName}`, 'PLAYER');
             const savedData = JSON.parse(savedStateJSON);
             const wallpaper = localStorage.getItem('datacenter_wallpaper');
             let freshState = createInitialState();
             
-            // This ensures new properties in freshState are kept if not in savedData
+            // --- FIX FOR ICON POSITIONS ---
+            // If the save file has icon positions, don't overwrite them with the default.
+            if (savedData.ui && savedData.ui.desktopIcons) {
+                delete freshState.ui.desktopIcons;
+            }
+
             const mergedData = deepMerge(freshState, savedData);
 
             const rehydratedData = {
                 ...mergedData,
                 isBooted: true,
+                hasCrashed: false, // Always reset crash state on load
                 time: new Date(savedData.time || freshState.time),
                 eventLog: (savedData.eventLog || []).map(e => ({ ...e, time: new Date(e.time) })),
-                // Ensure tutorial is off for loaded games
-                tutorial: { ...mergedData.tutorial, isActive: false },
             };
             if (wallpaper) rehydratedData.ui.desktopSettings.wallpaper = wallpaper;
-
-            // Migration for old saves from before the file system update
-            if (savedData.scripting && savedData.scripting.scripts && !savedData.scripting.fileSystem) {
-                rehydratedData.scripting.fileSystem = {};
-                Object.values(savedData.scripting.scripts).forEach(script => {
-                    const path = `/home/${script.agentName}/${script.name}.js`;
-                    rehydratedData.scripting.fileSystem[path] = { ...script, path };
-                });
-            }
-            
             set({ state: rehydratedData });
-            get().addEventLog(`Session "${slotName}" loaded.`, 'System', 'PLAYER');
         }
     },
     advanceTime: (seconds) => set(produce(draft => {
@@ -147,80 +140,77 @@ const useGameStore = create((set, get) => ({
         const kwhConsumedThisTick = (draft.state.power.load / 1000) * (seconds / 3600);
         draft.state.power.totalConsumedKwh += kwhConsumedThisTick;
     })),
-    togglePause: () => set(produce(draft => { 
-        playSound('ui_click');
-        draft.state.isPaused = !draft.state.isPaused; 
-    })),
-    setGameSpeed: (speed) => set(produce(draft => { 
-        playSound('ui_click');
-        draft.state.gameSpeed = speed; 
-    })),
-    addEventLog: (message, source = "System", level = "INFO") => {
-        const logEntry = { id: Date.now() + Math.random(), time: new Date(get().state.time), source, level, message: `[${source}] ${message}` };
+    togglePause: () => set(produce(draft => { draft.state.isPaused = !draft.state.isPaused; })),
+    setGameSpeed: (speed) => set(produce(draft => { draft.state.gameSpeed = speed; })),
+    addEventLog: (message, level = 'INFO', source = "System") => {
+        const logEntry = { id: Date.now() + Math.random(), time: get().state.time, source, level, message };
         set(produce(draft => {
             draft.state.eventLog.unshift(logEntry);
             if (draft.state.eventLog.length > 200) draft.state.eventLog.pop();
         }));
     },
     triggerBSOD: () => set(produce(draft => { draft.state.hasCrashed = true; })),
-    reboot: () => window.location.reload(),
     
     // --- UI State Management ---
-    openApp: (appId) => set(produce(draft => {
-        const existingWindow = Object.values(draft.state.ui.windows).find(w => w.appId === appId);
-        if (existingWindow) {
-            if (existingWindow.isMinimized) {
-                existingWindow.isMinimized = false;
+    openApp: (appId) => {
+        set(produce(draft => {
+            const existingWindow = Object.values(draft.state.ui.windows).find(w => w.appId === appId);
+            if (existingWindow) {
+                if (existingWindow.isMinimized) {
+                    existingWindow.isMinimized = false;
+                }
+                draft.state.ui.activeWindowId = existingWindow.id;
+                existingWindow.zIndex = draft.state.ui.nextZIndex;
+                draft.state.ui.nextZIndex += 1;
+                return;
             }
-            get().focusWindow(existingWindow.id); 
-            playSound('window_open');
-            return;
-        }
 
-        const newId = `win-${draft.state.ui.lastWindowId + 1}`;
-        draft.state.ui.lastWindowId += 1;
-        draft.state.ui.windows[newId] = {
-            id: newId,
-            appId,
-            title: APPS_CONFIG[appId].title,
-            isOpen: true,
-            isMinimized: false,
-            isMaximized: false,
-            zIndex: draft.state.ui.nextZIndex,
-            position: { x: 50 + (draft.state.ui.lastWindowId % 10) * 20, y: 50 + (draft.state.ui.lastWindowId % 10) * 20 },
-            size: { width: 800, height: 600 }
-        };
-        draft.state.ui.nextZIndex += 1;
-        draft.state.ui.activeWindowId = newId;
-        playSound('window_open');
-        get().addEventLog(`Opened app: ${appId}`, 'Player', 'PLAYER');
-    })),
+            const newId = `win-${draft.state.ui.lastWindowId + 1}`;
+            draft.state.ui.lastWindowId += 1;
+            draft.state.ui.windows[newId] = {
+                id: newId,
+                appId,
+                title: APPS_CONFIG[appId].title,
+                isOpen: true,
+                isMinimized: false,
+                isMaximized: false,
+                zIndex: draft.state.ui.nextZIndex,
+                position: { x: 50 + (draft.state.ui.lastWindowId % 10) * 20, y: 50 + (draft.state.ui.lastWindowId % 10) * 20 },
+                size: { width: 800, height: 600 }
+            };
+            draft.state.ui.nextZIndex += 1;
+            draft.state.ui.activeWindowId = newId;
+        }));
+        get().addEventLog(`Opened app: ${APPS_CONFIG[appId].title}`, 'PLAYER');
+    },
     closeWindow: (id) => set(produce(draft => {
         delete draft.state.ui.windows[id];
         if (draft.state.ui.activeWindowId === id) draft.state.ui.activeWindowId = null;
-        playSound('window_close');
     })),
     minimizeWindow: (id) => set(produce(draft => {
         if (draft.state.ui.windows[id]) {
             draft.state.ui.windows[id].isMinimized = true;
         }
         if (draft.state.ui.activeWindowId === id) draft.state.ui.activeWindowId = null;
-        playSound('window_close');
     })),
     maximizeWindow: (id) => set(produce(draft => {
         if (draft.state.ui.windows[id]) {
             draft.state.ui.windows[id].isMaximized = !draft.state.ui.windows[id].isMaximized;
         }
-        get().focusWindow(id);
-        playSound('ui_click');
+        if (!draft.state.ui.windows[id].isMaximized) {
+             draft.state.ui.windows[id].zIndex = get().state.ui.nextZIndex;
+             set(produce(d => { d.state.ui.nextZIndex += 1; }));
+        }
     })),
     focusWindow: (id) => set(produce(draft => {
-        if (!draft.state.ui.windows[id] || draft.state.ui.activeWindowId === id) return;
+        if (!draft.state.ui.windows[id]) return;
 
-        draft.state.ui.windows[id].zIndex = draft.state.ui.nextZIndex;
-        draft.state.ui.nextZIndex += 1;
-        draft.state.ui.activeWindowId = id;
-        if (draft.state.ui.windows[id].isMinimized) {
+        if (draft.state.ui.activeWindowId !== id) {
+            draft.state.ui.windows[id].zIndex = draft.state.ui.nextZIndex;
+            draft.state.ui.nextZIndex += 1;
+            draft.state.ui.activeWindowId = id;
+        }
+         if (draft.state.ui.windows[id].isMinimized) {
             draft.state.ui.windows[id].isMinimized = false;
         }
     })),
@@ -236,13 +226,21 @@ const useGameStore = create((set, get) => ({
             icon.position = position;
         }
     })),
-    setTheme: (themeName) => set(produce(draft => { draft.state.ui.desktopSettings.theme = themeName; get().addEventLog(`Theme set to ${themeName}`, 'Player', 'PLAYER'); })),
-    setAccentColor: (colorName) => set(produce(draft => { draft.state.ui.desktopSettings.accentColor = colorName; get().addEventLog(`Accent color set to ${colorName}`, 'Player', 'PLAYER'); })),
-    setTaskbarPosition: (position) => set(produce(draft => { draft.state.ui.desktopSettings.taskbarPosition = position; get().addEventLog(`Taskbar position set to ${position}`, 'Player', 'PLAYER'); })),
+    setTheme: (themeName) => {
+        get().addEventLog(`Theme changed to: ${themeName}`, 'PLAYER');
+        set(produce(draft => { draft.state.ui.desktopSettings.theme = themeName; }));
+    },
+    setAccentColor: (color) => {
+        get().addEventLog(`Accent color changed to: ${color}`, 'PLAYER');
+        set(produce(draft => { draft.state.ui.desktopSettings.accentColor = color; }));
+    },
+    setTaskbarPosition: (position) => {
+        get().addEventLog(`Taskbar position changed to: ${position}`, 'PLAYER');
+        set(produce(draft => { draft.state.ui.desktopSettings.taskbarPosition = position; }));
+    },
     setWallpaper: (wallpaperUrl) => {
         localStorage.setItem('datacenter_wallpaper', wallpaperUrl);
         set(produce(draft => { draft.state.ui.desktopSettings.wallpaper = wallpaperUrl; }));
-        get().addEventLog(`Wallpaper changed.`, 'Player', 'PLAYER');
     },
     
     // --- Finances ---
@@ -260,33 +258,32 @@ const useGameStore = create((set, get) => ({
         draft.state.finances.lastBill = totalExpenses;
         draft.state.power.totalConsumedKwh = 0;
         draft.state.lastMonth = time.getMonth();
-        get().addEventLog(`Monthly billing processed. Revenue: $${totalRevenue.toFixed(2)}, Expenses: $${totalExpenses.toFixed(2)}`, 'Finance');
+        get().addEventLog(`Monthly billing processed. Revenue: $${totalRevenue.toFixed(2)}, Expenses: $${totalExpenses.toFixed(2)}`, 'INFO', 'Finance');
     })),
 
     // --- Inventory & Hardware ---
-    purchaseAndStageItem: (item, quantity) => set(produce(draft => {
+    purchaseAndStageItem: (item, quantity) => {
         const totalCost = item.price * quantity;
-        if (draft.state.finances.cash >= totalCost) {
-            draft.state.finances.cash -= totalCost;
-            for (let i = 0; i < quantity; i++) {
-                const stagedId = `${item.id}_${Date.now() + i}`;
-                draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
-            }
-            get().addEventLog(`Purchased ${quantity}x ${item.name}.`, 'Player', 'PLAYER');
-            if(get().state.tutorial.isActive && get().state.tutorial.steps[get().state.tutorial.step]?.trigger.action === 'purchaseItem') {
-                get().advanceTutorial();
-            }
+        if (get().state.finances.cash >= totalCost) {
+            get().spendCash(totalCost);
+            set(produce(draft => {
+                for (let i = 0; i < quantity; i++) {
+                    const stagedId = `${item.id}_${Date.now() + i}`;
+                    draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
+                }
+            }));
+            get().addEventLog(`Purchased ${quantity}x ${item.name}`, 'PLAYER');
         }
-    })),
+    },
     stageHardware: (task) => set(produce(draft => {
         const stagedId = `${task.onCompleteEffect.item}_${Date.now()}`;
         draft.state.stagedHardware.push({ id: stagedId, type: task.onCompleteEffect.item, location: 'Tech Room' });
-        get().addEventLog(`Hardware staged: ${task.onCompleteEffect.item}`, 'System', 'INFO');
+        get().addEventLog(`Hardware staged: ${task.onCompleteEffect.item}`, 'INFO', 'Tasks');
     })),
     installHardware: (task, itemDetails) => set(produce(draft => {
         const stagedItemIndex = draft.state.stagedHardware.findIndex(h => h.id === task.requiredStaged);
         if (stagedItemIndex === -1) {
-            get().addEventLog(`Staged item ${task.requiredStaged} not found for installation.`, 'System', 'ERROR');
+            get().addEventLog(`Staged item ${task.requiredStaged} not found for installation.`, 'ERROR', 'Tasks');
             return;
         }
         
@@ -299,11 +296,11 @@ const useGameStore = create((set, get) => ({
         } else if (task.targetLocation && draft.state.dataCenterLayout[task.targetLocation]) {
              draft.state.dataCenterLayout[task.targetLocation].contents.push(newItem);
         } else {
-            get().addEventLog(`Target location ${task.targetLocation} not found for hardware installation.`, 'System', 'ERROR');
+            get().addEventLog(`Target location ${task.targetLocation} not found for hardware installation.`, 'ERROR', 'Tasks');
             draft.state.stagedHardware.push(stagedItem); // Return item to staged
             return;
         }
-        get().addEventLog(`${itemDetails.name} installed.`, 'System', 'INFO');
+        get().addEventLog(`${itemDetails.name} installed in ${task.targetLocation || 'facility'}.`, 'INFO', 'Tasks');
     })),
     bringHardwareOnline: (task) => set(produce(draft => {
         const rack = Object.values(draft.state.dataCenterLayout).find(r => r.contents?.some(d => d.id === task.targetItem));
@@ -342,30 +339,35 @@ const useGameStore = create((set, get) => ({
     })),
 
     // --- Task & Employee Management ---
-    createTask: (taskDef) => set(produce(draft => {
-        const taskId = `task_${Date.now()}`;
-        const newTask = { ...taskDef, id: taskId, status: 'Pending', assignedTo: null, completionTime: null };
-        draft.state.tasks.push(newTask);
-        get().addEventLog(`New task created: ${taskDef.description}`, 'Player', 'PLAYER');
-        if(get().state.tutorial.isActive && get().state.tutorial.steps[get().state.tutorial.step]?.trigger.action === 'createTask') {
-            get().advanceTutorial();
-        }
-    })),
-    abortTask: (taskId) => set(produce(draft => {
-        const taskIndex = draft.state.tasks.findIndex(t => t.id === taskId);
-        if (taskIndex > -1) {
-            const task = draft.state.tasks[taskIndex];
-            if (task.assignedTo) {
-                const employee = draft.state.employees.find(e => e.id === task.assignedTo);
-                if (employee) {
-                    employee.status = 'Idle';
-                    employee.assignedTaskId = null;
+    createTask: (taskDef) => {
+        set(produce(draft => {
+            const taskId = `task_${Date.now()}`;
+            const newTask = { ...taskDef, id: taskId, status: 'Pending', assignedTo: null, completionTime: null };
+            
+            draft.state.tasks.push(newTask);
+        }));
+        get().addEventLog(`New task created: ${taskDef.description}`, 'PLAYER');
+    },
+    abortTask: (taskId) => {
+        const task = get().state.tasks.find(t => t.id === taskId);
+        if (task) {
+            get().addEventLog(`Task aborted: ${task.description}`, 'PLAYER');
+            set(produce(draft => {
+                const taskIndex = draft.state.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex > -1) {
+                    const task = draft.state.tasks[taskIndex];
+                    if (task.assignedTo) {
+                        const employee = draft.state.employees.find(e => e.id === task.assignedTo);
+                        if (employee) {
+                            employee.status = 'Idle';
+                            employee.assignedTaskId = null;
+                        }
+                    }
+                    draft.state.tasks.splice(taskIndex, 1);
                 }
-            }
-            draft.state.tasks.splice(taskIndex, 1);
-            get().addEventLog(`Task aborted: ${task.description}`, 'Player', 'PLAYER');
+            }));
         }
-    })),
+    },
     updateTask: (taskId, updates) => set(produce(draft => {
         const task = draft.state.tasks.find(t => t.id === taskId);
         if (task) Object.assign(task, updates);
@@ -377,46 +379,48 @@ const useGameStore = create((set, get) => ({
         const employee = draft.state.employees.find(e => e.id === employeeId);
         if (employee) Object.assign(employee, updates);
     })),
-    hireEmployee: (employee) => set(produce(draft => {
-        draft.state.employees.push({ ...employee, status: 'Idle', assignedTaskId: null, location: 'Break Room' });
-        get().addEventLog(`${employee.name} has been hired.`, 'Player', 'PLAYER');
-         if(get().state.tutorial.isActive && get().state.tutorial.steps[get().state.tutorial.step]?.trigger.action === 'hireEmployee') {
-            get().advanceTutorial();
-        }
-    })),
+    hireEmployee: (employee) => {
+        set(produce(draft => {
+            draft.state.employees.push({ ...employee, status: 'Idle', assignedTaskId: null, location: 'Break Room' });
+        }));
+        get().addEventLog(`${employee.name} has been hired.`, 'PLAYER');
+    },
 
     // --- Core Gameplay Functions ---
-    signIspContract: (contract, cidr) => set(produce(draft => {
-        if (draft.state.network.ispContract) {
-            get().addEventLog("An ISP contract is already active.", "System", "ERROR");
+    signIspContract: (contract, cidr) => {
+        if (get().state.network.ispContract) {
+            get().addEventLog("An ISP contract is already active.", "ERROR", "Network");
             return;
         }
-        const [baseIp, prefix] = cidr.split('/');
-        const numAddresses = Math.pow(2, 32 - parseInt(prefix)) - 2;
-        const ips = Array.from({ length: numAddresses }, (_, i) => {
-            const ipParts = baseIp.split('.').map(Number);
-            ipParts[3] += (i + 1);
-            return ipParts.join('.');
-        });
+        set(produce(draft => {
+            const [baseIp, prefix] = cidr.split('/');
+            const numAddresses = Math.pow(2, 32 - parseInt(prefix)) - 2;
+            const ips = Array.from({ length: numAddresses }, (_, i) => {
+                return `198.51.100.${i + 1}`; // Example static IP range
+            });
 
-        draft.state.network.ispContract = contract;
-        draft.state.network.publicIpBlock = { cidr, ips };
-        draft.state.finances.cash -= contract.monthlyCost;
-        get().addEventLog(`Signed contract with ${contract.name}. Leased IP block ${cidr}.`, "Network");
-    })),
-    acceptContract: (contractId) => set(produce(draft => {
-        if (draft.state.activeContracts.includes(contractId)) return;
+            draft.state.network.ispContract = contract;
+            draft.state.network.publicIpBlock = { cidr, ips };
+            draft.state.finances.cash -= contract.monthlyCost;
+        }));
+        get().addEventLog(`Signed contract with ${contract.name}. Leased IP block ${cidr}.`, 'PLAYER');
+    },
+    acceptContract: (contractId) => {
+        if (get().state.activeContracts.includes(contractId)) return;
         const contract = CLIENT_CONTRACTS.find(c => c.id === contractId);
         if (contract) {
-            draft.state.activeContracts.push(contractId);
-            draft.state.finances.monthlyRevenue += contract.monthlyRevenue;
-            get().addEventLog(`Accepted contract: ${contract.name}.`, 'Client');
+            set(produce(draft => {
+                draft.state.activeContracts.push(contractId);
+                draft.state.finances.monthlyRevenue += contract.monthlyRevenue;
+            }));
+            get().addEventLog(`Accepted contract: ${contract.name}.`, 'PLAYER');
         }
-    })),
-    toggleGridPower: () => set(produce(draft => {
-        draft.state.power.gridActive = !draft.state.power.gridActive;
-        get().addEventLog(`City power grid is now ${draft.state.power.gridActive ? 'ONLINE' : 'OFFLINE'}.`, 'Power');
-    })),
+    },
+    toggleGridPower: () => {
+        const newStatus = !get().state.power.gridActive;
+        get().addEventLog(`City power grid is now ${newStatus ? 'ONLINE' : 'OFFLINE'}.`, 'PLAYER');
+        set(produce(draft => { draft.state.power.gridActive = newStatus; }));
+    },
     updatePowerAndCooling: (power, cooling, temp) => set(produce(draft => {
         draft.state.power.load = power.totalLoad;
         draft.state.power.capacity = power.totalCapacity;
@@ -425,54 +429,38 @@ const useGameStore = create((set, get) => ({
         draft.state.serverRoomTemp = temp;
     })),
     
-    // --- Scripting System ---
-    createScriptAgent: (name) => set(produce(draft => {
-        if (!draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name] = { name, permissions: [], isCallable: false };
-        }
-    })),
-    deleteScriptAgent: (name) => set(produce(draft => {
-        if (name === 'system') return;
-        delete draft.state.scripting.agents[name];
-        // Also delete files associated with this agent
-        const newFileSystem = {};
-        for (const path in draft.state.scripting.fileSystem) {
-            if (!path.startsWith(`/home/${name}/`)) {
-                newFileSystem[path] = draft.state.scripting.fileSystem[path];
-            }
-        }
-        draft.state.scripting.fileSystem = newFileSystem;
-    })),
-    setAgentCallable: (name, isCallable) => set(produce(draft => {
-        if (draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name].isCallable = isCallable;
-        }
-    })),
-    updateAgentPermissions: (name, permissions) => set(produce(draft => {
-        if (draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name].permissions = permissions;
-        }
-    })),
-    createFile: (path, metadata) => set(produce(draft => {
-        if (!draft.state.scripting.fileSystem[path]) {
-            draft.state.scripting.fileSystem[path] = {
-                path,
-                content: `# New script at ${path}\n`,
-                status: 'paused',
-                interval: 60,
-                lastRunTime: null,
-                ...metadata
-            };
-        }
-    })),
-    updateFile: (path, updates) => set(produce(draft => {
+    // --- Scripting & File System ---
+    deployDaemon: (serverId, config) => {
+        get().addEventLog(`Deployed monitoring daemon to server ${serverId}.`, 'PLAYER');
+        set(produce(draft => { draft.state.scripting.daemons[serverId] = config; }));
+    },
+    removeDaemon: (serverId) => {
+        get().addEventLog(`Removed monitoring daemon from server ${serverId}.`, 'PLAYER');
+        set(produce(draft => { delete draft.state.scripting.daemons[serverId]; }));
+    },
+    createFile: (path, content, metadata) => {
+        get().addEventLog(`Created file: ${path}`, 'PLAYER');
+        set(produce(draft => { draft.state.scripting.fileSystem[path] = { content, ...metadata }; }));
+    },
+    updateFile: (path, content) => set(produce(draft => {
         if (draft.state.scripting.fileSystem[path]) {
-            Object.assign(draft.state.scripting.fileSystem[path], updates);
+            draft.state.scripting.fileSystem[path].content = content;
         }
     })),
-    deleteFile: (path) => set(produce(draft => {
-        delete draft.state.scripting.fileSystem[path];
-    })),
+    deleteFile: (path) => {
+        get().addEventLog(`Deleted file: ${path}`, 'PLAYER');
+        set(produce(draft => { delete draft.state.scripting.fileSystem[path]; }));
+    },
+    renameFile: (oldPath, newPath) => {
+        get().addEventLog(`Renamed file from ${oldPath} to ${newPath}`, 'PLAYER');
+        set(produce(draft => {
+            if (draft.state.scripting.fileSystem[oldPath]) {
+                draft.state.scripting.fileSystem[newPath] = draft.state.scripting.fileSystem[oldPath];
+                delete draft.state.scripting.fileSystem[oldPath];
+            }
+        }));
+    },
+
     addToast: (title, message) => set(produce(draft => {
         const id = `toast_${Date.now()}`;
         draft.state.scripting.toasts.push({ id, title, message });
@@ -488,40 +476,17 @@ const useGameStore = create((set, get) => ({
         draft.state.scripting.alerts = draft.state.scripting.alerts.filter(a => a.id !== id);
     })),
 
-    // --- Daemon Manager ---
-    deployDaemon: (serverId, config) => set(produce(draft => {
-        draft.state.scripting.daemons[serverId] = config;
-        get().addEventLog(`Monitoring daemon deployed to ${serverId}.`, 'Player', 'PLAYER');
-    })),
-    removeDaemon: (serverId) => set(produce(draft => {
-        delete draft.state.scripting.daemons[serverId];
-        get().addEventLog(`Monitoring daemon removed from ${serverId}.`, 'Player', 'PLAYER');
-    })),
-
-    // --- Tutorial ---
-    advanceTutorial: () => set(produce(draft => {
-        playSound('ui_click');
-        const nextStep = draft.state.tutorial.step + 1;
-        if (nextStep < draft.state.tutorial.steps.length) {
-            draft.state.tutorial.step = nextStep;
-            if (draft.state.tutorial.steps[nextStep].trigger.action === 'end') {
-                draft.state.tutorial.isActive = false;
-            }
-        } else {
-            draft.state.tutorial.isActive = false;
+    // --- Tutorial & Achievements ---
+    advanceTutorial: () => set(produce(draft => { draft.state.tutorial.step += 1; })),
+    setTutorialTarget: (elementId) => set(produce(draft => { draft.state.tutorial.targetElement = elementId; })),
+    unlockAchievement: (achievementId) => {
+        const { addToast } = get();
+        const achievement = ACHIEVEMENT_DEFINITIONS[achievementId];
+        if (achievement && !get().state.achievements.unlocked.includes(achievementId)) {
+            set(produce(draft => { draft.state.achievements.unlocked.push(achievementId); }));
+            addToast("🏆 Achievement Unlocked!", achievement.title);
         }
-    })),
-
-    // --- Achievements ---
-    unlockAchievement: (id) => set(produce(draft => {
-        if (!draft.state.achievements.unlocked.includes(id)) {
-            draft.state.achievements.unlocked.push(id);
-            const achievement = ACHIEVEMENT_DEFINITIONS.find(a => a.id === id);
-            if (achievement) {
-                get().addToast("Achievement Unlocked!", achievement.title);
-            }
-        }
-    })),
+    },
 }));
 
 export default useGameStore;
