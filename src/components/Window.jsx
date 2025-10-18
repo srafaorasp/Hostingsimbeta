@@ -6,49 +6,54 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
     const { closeWindow, minimizeWindow, maximizeWindow, focusWindow, updateWindowState } = useGameStore.getState();
     const dragControls = useDragControls();
 
-    // --- FIX for Window Snapping ---
+    // --- DEFINITIVE FIX for Window Snapping ---
     const handleDragEnd = (event, info) => {
-        // The `info.point` gives the final absolute cursor position.
-        // We update the state with this corrected position.
-        updateWindowState(id, { position: { x: info.point.x, y: info.point.y } });
+        // We calculate the new position by adding the final drag offset to the window's starting position.
+        // This provides a stable and correct final position.
+        const newPosition = {
+            x: position.x + info.offset.x,
+            y: position.y + info.offset.y,
+        };
+        updateWindowState(id, { position: newPosition });
     };
 
-    // --- Resize Logic ---
-    const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0, startX: 0, startY: 0 });
+    // --- DEFINITIVE FIX for Resizing Logic ---
+    const resizeStartRef = useRef(null);
 
-    const handleResizeMove = useCallback((e, direction) => {
-        let { width, height, startX, startY } = resizeStartPos.current;
-        const dx = e.clientX - resizeStartPos.current.x;
-        const dy = e.clientY - resizeStartPos.current.y;
+    const handleResizeMove = useCallback((e) => {
+        if (!resizeStartRef.current) return;
 
-        let newWidth = width;
-        let newHeight = height;
-        let newX = startX;
-        let newY = startY;
+        const { startSize, startPosition, direction } = resizeStartRef.current;
+        const dx = e.clientX - resizeStartRef.current.x;
+        const dy = e.clientY - resizeStartRef.current.y;
 
-        if (direction.includes('right')) newWidth = Math.max(300, width + dx);
-        if (direction.includes('bottom')) newHeight = Math.max(200, height + dy);
-        if (direction.includes('left')) {
-            newWidth = Math.max(300, width - dx);
-            if (newWidth > 300) newX = startX + dx;
-        }
-        if (direction.includes('top')) {
-            newHeight = Math.max(200, height - dy);
-            if (newHeight > 200) newY = startY + dy;
-        }
+        let newWidth = startSize.width;
+        let newHeight = startSize.height;
+        let newX = startPosition.x;
+        let newY = startPosition.y;
+
+        // Apply size changes
+        if (direction.includes('right')) newWidth = Math.max(300, startSize.width + dx);
+        if (direction.includes('bottom')) newHeight = Math.max(200, startSize.height + dy);
+        if (direction.includes('left')) newWidth = Math.max(300, startSize.width - dx);
+        if (direction.includes('top')) newHeight = Math.max(200, startSize.height - dy);
+
+        // Apply position changes for left/top drags
+        if (direction.includes('left') && newWidth > 300) newX = startPosition.x + dx;
+        if (direction.includes('top') && newHeight > 200) newY = startPosition.y + dy;
 
         updateWindowState(id, {
             size: { width: newWidth, height: newHeight },
             position: { x: newX, y: newY }
         });
-
     }, [id, updateWindowState]);
 
     const handleResizeEnd = useCallback(() => {
         document.documentElement.style.cursor = '';
-        document.removeEventListener('mousemove', resizeStartPos.current.moveHandler);
+        document.removeEventListener('mousemove', handleResizeMove);
         document.removeEventListener('mouseup', handleResizeEnd);
-    }, []);
+        resizeStartRef.current = null;
+    }, [handleResizeMove]);
 
     const handleResizeStart = useCallback((e, direction) => {
         e.stopPropagation();
@@ -56,17 +61,15 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
         
         document.documentElement.style.cursor = `${direction}-resize`;
 
-        resizeStartPos.current = {
+        resizeStartRef.current = {
             x: e.clientX,
             y: e.clientY,
-            width: size.width,
-            height: size.height,
-            startX: position.x,
-            startY: position.y,
-            moveHandler: (moveEvent) => handleResizeMove(moveEvent, direction)
+            startSize: size,
+            startPosition: position,
+            direction: direction,
         };
         
-        document.addEventListener('mousemove', resizeStartPos.current.moveHandler);
+        document.addEventListener('mousemove', handleResizeMove);
         document.addEventListener('mouseup', handleResizeEnd, { once: true });
     }, [id, focusWindow, size, position, handleResizeMove, handleResizeEnd]);
 
@@ -87,22 +90,23 @@ const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, 
         <motion.div
             key={id}
             className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden text-gray-200 ${isActive ? 'shadow-accent/50' : 'shadow-black/50'} ${isMaximized ? 'rounded-none' : 'rounded-lg'}`}
-            style={{
+            style={{ 
                 zIndex,
-                // --- FIX for Snapping ---
-                // We set the initial position via style so framer-motion has the correct starting point
-                // The animate prop will take over from here.
-                top: position.y,
-                left: position.x,
+                // We now exclusively use transforms for positioning
+                x: position.x,
+                y: position.y,
+                width: size.width,
+                height: size.height,
             }}
             animate={{
                 width: isMaximized ? '100%' : size.width,
                 height: isMaximized ? `calc(100vh - 7rem)` : size.height,
-                // We no longer animate x and y here; drag controls them
+                x: isMaximized ? 0 : position.x,
+                y: isMaximized ? 0 : position.y,
             }}
-            initial={false} // We don't need the initial animation anymore
+            initial={{ opacity: 0, scale: 0.9 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+            transition={{ duration: 0.1, ease: "easeOut" }}
             drag={!isMaximized}
             dragListener={false}
             dragControls={dragControls}
