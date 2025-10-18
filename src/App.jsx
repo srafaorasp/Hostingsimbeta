@@ -22,24 +22,36 @@ const Desktop = () => {
     const desktopIcons = useGameStore(s => s.state.ui.desktopIcons || [], shallow);
     const fileInputRef = useRef(null);
 
+    // --- FIX for Icon Overflow & Sticking ---
+    const desktopRef = useRef(null); // Ref to get the desktop dimensions
+
     const [, drop] = useDrop(() => ({
         accept: 'icon',
         drop: (item, monitor) => {
             const delta = monitor.getDifferenceFromInitialOffset();
-            const left = Math.round(item.position.x + delta.x);
-            const top = Math.round(item.position.y + delta.y);
+            let left = Math.round(item.position.x + delta.x);
+            let top = Math.round(item.position.y + delta.y);
+
+            // Constrain icons to the desktop area
+            if (desktopRef.current) {
+                const desktopRect = desktopRef.current.getBoundingClientRect();
+                const iconWidth = 96; // approx width of DesktopIcon
+                const iconHeight = 80; // approx height of DesktopIcon
+                left = Math.max(0, Math.min(left, desktopRect.width - iconWidth));
+                top = Math.max(0, Math.min(top, desktopRect.height - iconHeight));
+            }
+
             updateIconPosition(item.appId, { x: left, y: top });
-            return undefined; // react-dnd requires a return value
+            return undefined;
         },
     }), [updateIconPosition]);
 
     return (
         <ContextMenu>
             <ContextMenuTrigger>
-                {/* --- THIS IS THE FIX --- */}
-                {/* This div is now a clean, relative container that correctly defines the desktop area */}
-                {/* All conflicting flexbox classes have been removed */}
-                <div ref={drop} className="relative h-full w-full">
+                {/* --- FIX for Icon Layout --- */}
+                {/* Removed conflicting flexbox classes and attached the ref */}
+                <div ref={node => { drop(node); desktopRef.current = node; }} className="relative h-full w-full">
                     {desktopIcons.map(iconConfig => {
                         if (!iconConfig) return null;
                         return (
@@ -99,7 +111,6 @@ export default function App() {
     return (
         <ErrorBoundary>
             <div className="font-sans h-screen w-screen bg-cover bg-center overflow-hidden select-none transition-colors duration-500" style={{ backgroundImage: wallpaper }}>
-                {/* This container correctly defines the space for the Desktop component */}
                 <div className={`absolute inset-0 ${desktopPadding} px-4`}>
                      <Desktop />
                 </div>
