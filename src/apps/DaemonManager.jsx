@@ -1,18 +1,19 @@
 import React, { useState, useMemo } from 'react';
-import useGameStore from '/src/store/gameStore.js';
-import { TASK_DEFINITIONS } from '/src/data.js';
+import useGameStore from '../store/gameStore.js';
 
 const DaemonManager = () => {
-    const deployDaemon = useGameStore(state => state.deployDaemon);
-    const removeDaemon = useGameStore(state => state.removeDaemon);
-    const daemons = useGameStore(state => state.state.scripting.daemons);
-    const agents = useGameStore(state => state.state.scripting.agents);
-    const employees = useGameStore(state => state.state.employees);
-    const dataCenterLayout = useGameStore(state => state.state.dataCenterLayout);
+    // --- FIX: Get stable actions non-reactively ---
+    const { deployDaemon, removeDaemon } = useGameStore.getState();
+
+    // --- FIX: Use granular selectors for each piece of reactive state ---
+    const daemons = useGameStore(s => s.state.scripting.daemons);
+    const agents = useGameStore(s => s.state.scripting.agents);
+    const employees = useGameStore(s => s.state.employees);
+    const dataCenterLayout = useGameStore(s => s.state.dataCenterLayout);
 
     const [selectedServerId, setSelectedServerId] = useState('');
     const [selectedAgent, setSelectedAgent] = useState('');
-    const [rules, setRules] = useState([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'showAlert', args: 'Power Alert,Server power draw is critical!' }]);
+    const [rules, setRules] = useState([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'alert', args: 'Power Alert,Server power draw is critical!' }]);
 
     const availableServers = useMemo(() => {
         const servers = [];
@@ -32,29 +33,28 @@ const DaemonManager = () => {
         if (!selectedServerId || !selectedAgent) return;
         const processedRules = rules.map(r => ({
             ...r,
-            args: r.args.split(',').map(arg => arg.trim()) // Convert comma-separated string to array
+            args: r.args.split(',').map(arg => arg.trim()) 
         }));
         const config = { agent: selectedAgent, rules: processedRules };
         deployDaemon(selectedServerId, config);
         setSelectedServerId('');
         setSelectedAgent('');
-        setRules([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'showAlert', args: 'Power Alert,Server power draw is critical!' }]);
+        setRules([{ metric: 'powerDraw', condition: '>', value: '400', action: 'alert', target: 'player', command: 'alert', args: 'Power Alert,Server power draw is critical!' }]);
     };
     
     const handleRuleChange = (index, field, value) => {
         const newRules = [...rules];
-        const rule = { ...newRules[index] }; // Create a copy
+        const rule = { ...newRules[index] }; 
         rule[field] = value;
         
-        // Auto-fill common actions
         if (field === 'action') {
             if (value === 'alert') {
-                rule.target = 'player'; rule.command = 'showAlert'; rule.args = 'Alert!,Metric is out of bounds';
+                rule.target = 'player'; rule.command = 'alert'; rule.args = 'Alert!,Metric is out of bounds';
             } else if (value === 'log') {
                 rule.target = 'system'; rule.command = 'log'; rule.args = 'Daemon alert: metric out of bounds';
             } else if (value === 'task') {
                 rule.target = employees.length > 0 ? employees[0].id : ''; 
-                rule.command = 'assignTask'; 
+                rule.command = 'assign:task'; 
                 rule.args = 'repair_hardware,' + (selectedServerId || 'self');
             }
         }

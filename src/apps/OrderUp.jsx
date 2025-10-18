@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
-import useGameStore from '../store/gameStore.js';
-import { HARDWARE_CATALOG } from '../data.js';
+import React, { useState, useMemo } from 'react';
+import useGameStore from '/src/store/gameStore.js';
+import { HARDWARE_CATALOG } from '/src/data.js';
+import { shallow } from 'zustand/shallow';
 
 const OrderUp = () => {
-    const purchaseAndStageItem = useGameStore(state => state.purchaseAndStageItem);
-    const cash = useGameStore(state => state.state.finances.cash);
-    const inventory = useGameStore(state => state.state.inventory); // Keep for now to display old items
+    // --- THIS IS THE FIX ---
+    // 1. Use granular selectors for reactive state.
+    const cash = useGameStore(s => s.state.finances.cash);
+    const stagedHardware = useGameStore(s => s.state.stagedHardware, shallow);
+
+    // 2. Get stable actions non-reactively.
+    const { purchaseAndStageItem } = useGameStore.getState();
 
     const [quantities, setQuantities] = useState({});
 
@@ -16,15 +21,23 @@ const OrderUp = () => {
 
     const handlePurchase = (item) => {
         const quantity = quantities[item.id] || 1;
-        const totalCost = item.price * quantity;
-        if (cash >= totalCost) {
-            purchaseAndStageItem(item, quantity);
-        }
+        purchaseAndStageItem(item, quantity);
     };
+
+    // Memoize the grouped hardware list to prevent unnecessary recalculations
+    const groupedStagedHardware = useMemo(() => {
+        if (!stagedHardware) return [];
+        const counts = {};
+        for (const item of stagedHardware) {
+            counts[item.type] = (counts[item.type] || 0) + 1;
+        }
+        return Object.entries(counts);
+    }, [stagedHardware]);
+
 
     return (
         <div className="p-4 bg-gray-800 text-gray-200 h-full flex flex-col">
-            <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">OrderUp</h2>
+            <h2 className="text-xl font-bold mb-4 border-b border-gray-600 pb-2">OrderUp Hardware Catalog</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow min-h-0">
                 <div className="bg-gray-900 p-3 rounded-md overflow-y-auto">
                     <h3 className="font-bold text-lg mb-2">Catalog</h3>
@@ -48,10 +61,10 @@ const OrderUp = () => {
                     </ul>
                 </div>
                 <div className="bg-gray-900 p-3 rounded-md">
-                    <h3 className="font-bold text-lg mb-2">Inventory (Legacy)</h3>
-                    {Object.keys(inventory).length === 0 ? <p className="text-gray-500">Empty.</p> : (
+                    <h3 className="font-bold text-lg mb-2">Staged Hardware (Tech Room)</h3>
+                    {groupedStagedHardware.length === 0 ? <p className="text-gray-500">Empty.</p> : (
                         <ul className="space-y-1">
-                            {Object.entries(inventory).map(([itemId, count]) => {
+                            {groupedStagedHardware.map(([itemId, count]) => {
                                 const itemDetails = HARDWARE_CATALOG.find(h => h.id === itemId);
                                 return (
                                     <li key={itemId} className="text-sm p-1 bg-gray-700 rounded flex justify-between">
@@ -62,7 +75,6 @@ const OrderUp = () => {
                             })}
                         </ul>
                     )}
-                     <p className="text-xs text-gray-400 mt-4">Note: Items are no longer added to inventory. New purchases are sent directly to the Tech Room.</p>
                 </div>
             </div>
         </div>

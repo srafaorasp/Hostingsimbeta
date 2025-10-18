@@ -1,19 +1,23 @@
 import React, { useState, useRef } from 'react';
-import useGameStore from '../store/gameStore.js';
+import useGameStore from '/src/store/gameStore.js';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 
-const THEMES = [ { name: 'Dark', id: 'dark' }, { name: 'Light', id: 'light' }, { name: 'Blue', id: 'blue' } ];
-const ACCENT_COLORS = [ { name: 'Blue', id: 'blue' }, { name: 'Green', id: 'green' }, { name: 'Red', id: 'red' }, { name: 'Purple', id: 'purple' }, { name: 'Orange', id: 'orange' }];
-const TASKBAR_POSITIONS = [ { name: 'Bottom', id: 'bottom' }, { name: 'Top', id: 'top' }];
 
 const SystemSettings = () => {
-    const { 
-        saveGame, setTheme, setAccentColor, setTaskbarPosition, setWallpaper 
-    } = useGameStore.getState();
+    // --- THIS IS THE FIX ---
+    // 1. Use individual, granular selectors for each piece of reactive state.
+    const theme = useGameStore(s => s.state.ui.desktopSettings.theme);
+    const accentColor = useGameStore(s => s.state.ui.desktopSettings.accentColor);
+    const taskbarPosition = useGameStore(s => s.state.ui.desktopSettings.taskbarPosition);
 
-    const theme = useGameStore(state => state.state.ui.desktopSettings.theme);
-    const accentColor = useGameStore(state => state.state.ui.desktopSettings.accentColor);
-    const taskbarPosition = useGameStore(state => state.state.ui.desktopSettings.taskbarPosition);
+    // 2. Get stable actions non-reactively.
+    const { saveGame, setTheme, setAccentColor, setTaskbarPosition, setWallpaper } = useGameStore.getState();
     const getFullState = () => useGameStore.getState().state;
+
 
     const [saveName, setSaveName] = useState('');
     const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -31,7 +35,15 @@ const SystemSettings = () => {
 
     const handleDebugDump = () => {
         const fullState = getFullState();
-        const stateString = JSON.stringify(fullState, (key, value) => value instanceof Date ? value.toISOString() : value, 2);
+        const stateString = JSON.stringify(fullState, (key, value) => {
+            if (value instanceof Map) {
+                return Array.from(value.entries());
+            }
+            if (value instanceof Date) {
+                return value.toISOString();
+            }
+            return value;
+        }, 2);
         const blob = new Blob([stateString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -57,64 +69,73 @@ const SystemSettings = () => {
                     <div className="bg-gray-900 p-6 rounded-lg shadow-lg text-center text-white">
                         <h3 className="text-lg font-bold mb-2">{modal.title}</h3>
                         <p className="mb-4">{modal.message}</p>
-                        <button onClick={modal.onConfirm} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500">OK</button>
+                        <Button onClick={modal.onConfirm}>OK</Button>
                     </div>
                 </div>
             )}
             <h2 className="text-xl font-bold border-b border-gray-600 pb-2">System Settings</h2>
             
-            <div className="bg-gray-900 p-3 rounded-md">
-                <h3 className="font-bold text-lg mb-2">Save Current Session</h3>
-                <div className="flex gap-2">
-                    <input type="text" value={saveName} onChange={e => setSaveName(e.target.value)} placeholder="Enter save name..." className="flex-grow bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm" />
-                    <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-1 rounded-md text-sm font-semibold hover:bg-blue-500">Save</button>
-                </div>
-            </div>
+            <Card className="bg-gray-900 border-gray-700">
+                <CardHeader><CardTitle>Save Current Session</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="flex gap-2">
+                        <Input type="text" value={saveName} onChange={e => setSaveName(e.target.value)} placeholder="Enter save name..." />
+                        <Button onClick={handleSave}>Save</Button>
+                    </div>
+                </CardContent>
+            </Card>
 
-            <div className="bg-gray-900 p-3 rounded-md">
-                <h3 className="font-bold text-lg mb-2">Appearance</h3>
-                <div className="space-y-3">
-                    <div>
-                        <h4 className="font-semibold text-sm mb-1">Color Theme</h4>
-                        <div className="flex gap-2">
-                            {THEMES.map(themeOption => (
-                                <button key={themeOption.id} onClick={() => setTheme(themeOption.id)} className={`px-4 py-2 rounded-md text-sm font-semibold ${theme === themeOption.id ? 'bg-accent text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                                    {themeOption.name}
-                                </button>
-                            ))}
-                        </div>
+            <Card className="bg-gray-900 border-gray-700">
+                 <CardHeader><CardTitle>Appearance</CardTitle></CardHeader>
+                 <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Color Theme</Label>
+                        <Select onValueChange={setTheme} value={theme}>
+                            <SelectTrigger><SelectValue placeholder="Select a theme" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="dark">Dark</SelectItem>
+                                <SelectItem value="light">Light</SelectItem>
+                                <SelectItem value="blue">Blue</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Accent Color</Label>
+                        <Select onValueChange={setAccentColor} value={accentColor}>
+                            <SelectTrigger><SelectValue placeholder="Select an accent" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="blue">Blue</SelectItem>
+                                <SelectItem value="green">Green</SelectItem>
+                                <SelectItem value="red">Red</SelectItem>
+                                <SelectItem value="purple">Purple</SelectItem>
+                                <SelectItem value="orange">Orange</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Taskbar Position</Label>
+                         <Select onValueChange={setTaskbarPosition} value={taskbarPosition}>
+                            <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="bottom">Bottom</SelectItem>
+                                <SelectItem value="top">Top</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div>
-                        <h4 className="font-semibold text-sm mb-1">Accent Color</h4>
-                        <div className="flex gap-2">
-                            {ACCENT_COLORS.map(colorOption => (
-                                <button key={colorOption.id} onClick={() => setAccentColor(colorOption.id)} className={`w-10 h-10 rounded-md border-2 ${accentColor === colorOption.id ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: `var(--theme-${colorOption.id})`.replace('theme-','').replace(' { --accent: ','').replace('; }','') }}></button>
-                            ))}
-                        </div>
+                        <Label>Desktop Wallpaper</Label>
+                        <Input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
+                        <Button onClick={() => fileInputRef.current.click()} variant="outline" className="w-full mt-2">Upload Custom Wallpaper</Button>
                     </div>
-                     <div>
-                        <h4 className="font-semibold text-sm mb-1">Taskbar Position</h4>
-                        <div className="flex gap-2">
-                            {TASKBAR_POSITIONS.map(posOption => (
-                                <button key={posOption.id} onClick={() => setTaskbarPosition(posOption.id)} className={`px-4 py-2 rounded-md text-sm font-semibold ${taskbarPosition === posOption.id ? 'bg-accent text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                                    {posOption.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
+                 </CardContent>
+            </Card>
 
-            <div className="bg-gray-900 p-3 rounded-md">
-                <h3 className="font-bold text-lg mb-2">Desktop Wallpaper</h3>
-                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleWallpaperChange} className="hidden" />
-                <button onClick={() => fileInputRef.current.click()} className="bg-gray-700 px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-600">Upload Custom Wallpaper</button>
-            </div>
-            
-            <div className="bg-gray-900 p-3 rounded-md mt-auto">
-                <h3 className="font-bold text-lg mb-2 text-yellow-400">Debugging</h3>
-                <button onClick={handleDebugDump} className="bg-yellow-600 text-gray-900 px-4 py-2 rounded-md text-sm font-semibold hover:bg-yellow-500">Download Debug Dump</button>
-            </div>
+            <Card className="bg-gray-900 border-gray-700 mt-auto">
+                 <CardHeader><CardTitle className="text-yellow-400">Debugging</CardTitle></CardHeader>
+                 <CardContent>
+                    <Button onClick={handleDebugDump} variant="destructive">Download Debug Dump</Button>
+                 </CardContent>
+            </Card>
         </div>
     );
 };

@@ -18,6 +18,7 @@ export const APPS_CONFIG = {
     'ScriptIDE': { title: 'ScriptIDE', icon: Icons.CodeIcon, component: React.lazy(() => import('./apps/ScriptIDE.jsx')) },
     'ScriptingGuide': { title: 'Scripting Guide', icon: Icons.BookIcon, component: React.lazy(() => import('./apps/ScriptingGuide.jsx')) },
     'Analytics': { title: 'Analytics', icon: Icons.LineChartIcon, component: React.lazy(() => import('./apps/Analytics.jsx')) },
+    'DaemonManager': { title: 'Daemon Manager', icon: Icons.BotIcon, component: React.lazy(() => import('./apps/DaemonManager.jsx')) },
 };
 
 

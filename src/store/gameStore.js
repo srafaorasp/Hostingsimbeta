@@ -1,60 +1,70 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
-import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH } from '/src/data.js';
+import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH } from '../data.js';
 
 // Helper function to create a fresh initial state
-const createInitialState = () => {
-    const initialIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
-        appId,
-        position: { x: 20, y: 20 + index * 90 },
-    }));
-
-    return {
-        time: new Date(2025, 8, 29, 8, 0, 0),
-        lastMonth: 8,
-        isPaused: true,
-        isBooted: false,
-        gameSpeed: 1,
-        finances: { cash: 75000, monthlyRevenue: 0, lastBill: 0 },
-        inventory: {}, // Inventory is now obsolete but kept for save game compatibility for now.
-        stagedHardware: [],
-        employees: [],
-        tasks: [],
-        dataCenterLayout: {},
-        nextRackSlot: 1,
-        power: { capacity: 0, load: 0, gridActive: true, totalConsumedKwh: 0 },
-        cooling: { capacity: 0, load: 0 },
-        serverRoomTemp: 21.0,
-        network: { capacity: 0, load: 0, ispContract: null, publicIpBlock: null, assignedPublicIps: {} },
-        nextInternalIp: 10,
-        activeContracts: [],
-        eventLog: [{ id: Date.now(), time: new Date(), message: "System OS booted successfully." }],
-        ui: {
-            desktopSettings: {
-                theme: 'dark',
-                wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`
-            },
-            desktopIcons: initialIcons,
-            windows: {},
-            activeWindowId: null,
-            nextZIndex: 10,
-            lastWindowId: 0,
+const createInitialState = () => ({
+    time: new Date(2025, 8, 29, 8, 0, 0),
+    lastMonth: 8,
+    isPaused: true,
+    isBooted: false,
+    gameSpeed: 1,
+    hasCrashed: false, // NEW: BSOD state
+    crashError: null,  // NEW: Store error info
+    finances: { 
+        cash: 75000, 
+        monthlyRevenue: 0, 
+        lastBill: 0,
+        cashHistory: [],
+    },
+    history: {
+        powerHistory: [],
+        tempHistory: [],
+    },
+    stagedHardware: [],
+    employees: [],
+    tasks: [],
+    dataCenterLayout: {},
+    nextRackSlot: 1,
+    power: { capacity: 0, load: 0, gridActive: true, totalConsumedKwh: 0 },
+    cooling: { capacity: 0, load: 0 },
+    serverRoomTemp: 21.0,
+    network: { capacity: 0, load: 0, ispContract: null, publicIpBlock: null, assignedPublicIps: {} },
+    nextInternalIp: 10,
+    activeContracts: [],
+    eventLog: [{ id: Date.now(), time: new Date(), message: "System OS booted successfully." }],
+    ui: {
+        desktopSettings: {
+            theme: 'dark',
+            wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`,
+            accentColor: 'blue',
+            taskbarPosition: 'bottom',
         },
-        scripting: {
-            agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
-            scripts: {},
-            toasts: [],
-            alerts: [],
-        },
-    }
-};
+        windows: {},
+        activeWindowId: null,
+        nextZIndex: 10,
+        lastWindowId: 0,
+        desktopIcons: [],
+    },
+    scripting: {
+        agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
+        scripts: {},
+        daemons: {},
+        toasts: [],
+        alerts: [],
+    },
+});
 
 
 // Helper function for deep merging states, crucial for loading games.
 const deepMerge = (target, source) => {
     for (const key in source) {
         if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
-            deepMerge(target[key], source[key]);
+            if (!Array.isArray(source[key])) {
+                 deepMerge(target[key], source[key]);
+            } else {
+                 target[key] = source[key];
+            }
         } else {
             target[key] = source[key];
         }
@@ -64,13 +74,21 @@ const deepMerge = (target, source) => {
 
 
 const useGameStore = create((set, get) => ({
-    // --- THE FIX: All state is now nested under a 'state' property ---
     state: createInitialState(),
 
     // --- System & Time ---
-    newGame: () => set({ state: { ...createInitialState(), isBooted: true, eventLog: [{ id: Date.now(), time: new Date(), message: "New session started." }] } }),
+    newGame: () => set(produce(draft => {
+        const initialState = createInitialState();
+        initialState.isBooted = true;
+        initialState.eventLog = [{ id: Date.now(), time: new Date(), message: "New session started." }];
+        initialState.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
+            appId,
+            position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
+        }));
+        draft.state = initialState;
+    })),
     saveGame: (slotName) => {
-        const dataToSave = get().state; // Read from state
+        const dataToSave = get().state;
         const stateString = JSON.stringify({ ...dataToSave, time: dataToSave.time.toISOString(), eventLog: dataToSave.eventLog.map(e => ({ ...e, time: e.time.toISOString() })) });
         localStorage.setItem(`datacenter_save_${slotName}`, stateString);
     },
@@ -80,6 +98,7 @@ const useGameStore = create((set, get) => ({
             const savedData = JSON.parse(savedStateJSON);
             const wallpaper = localStorage.getItem('datacenter_wallpaper');
             let freshState = createInitialState();
+            
             const mergedData = deepMerge(freshState, savedData);
 
             const rehydratedData = {
@@ -89,9 +108,54 @@ const useGameStore = create((set, get) => ({
                 eventLog: (savedData.eventLog || []).map(e => ({ ...e, time: new Date(e.time) })),
             };
             if (wallpaper) rehydratedData.ui.desktopSettings.wallpaper = wallpaper;
+
+             if (!rehydratedData.ui.desktopIcons || rehydratedData.ui.desktopIcons.length === 0) {
+                rehydratedData.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
+                    appId,
+                    position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
+                }));
+            }
+
             set({ state: rehydratedData });
         }
     },
+    // --- NEW: Crash Handling ---
+    triggerBSOD: (error, errorInfo) => {
+        // 1. Download Debug Log
+        const fullState = get().state;
+        const stateString = JSON.stringify({
+            error: error.toString(),
+            errorInfo: errorInfo,
+            gameState: { ...fullState, time: fullState.time.toISOString() }
+        }, (key, value) => value instanceof Date ? value.toISOString() : value, 2);
+        
+        const blob = new Blob([stateString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `fatal-error-dump-${new Date().toISOString()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // 2. Set crash state
+        set(produce(draft => {
+            draft.state.hasCrashed = true;
+            draft.state.crashError = { message: error.toString() };
+            draft.state.isPaused = true;
+        }));
+    },
+    rebootSystem: () => set(produce(draft => {
+        const freshState = createInitialState();
+        freshState.isBooted = true; // Go back to desktop, not login
+        freshState.eventLog = [{ id: Date.now(), time: new Date(), message: "System rebooted after a critical error." }];
+        freshState.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
+            appId,
+            position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
+        }));
+        draft.state = freshState;
+    })),
+    // --- End of new Crash Handling ---
+
     advanceTime: (seconds) => set(produce(draft => {
         const newTime = new Date(draft.state.time);
         newTime.setSeconds(newTime.getSeconds() + seconds);
@@ -113,9 +177,7 @@ const useGameStore = create((set, get) => ({
     openApp: (appId) => set(produce(draft => {
         const existingWindow = Object.values(draft.state.ui.windows).find(w => w.appId === appId);
         if (existingWindow) {
-            if (existingWindow.isMinimized) {
-                existingWindow.isMinimized = false;
-            }
+            draft.state.ui.windows[existingWindow.id].isMinimized = false;
             get().focusWindow(existingWindow.id); 
             return;
         }
@@ -153,27 +215,27 @@ const useGameStore = create((set, get) => ({
         get().focusWindow(id);
     })),
     focusWindow: (id) => set(produce(draft => {
-        if (!draft.state.ui.windows[id]) return;
-
-        if (draft.state.ui.activeWindowId !== id) {
-            draft.state.ui.windows[id].zIndex = draft.state.ui.nextZIndex;
-            draft.state.ui.nextZIndex += 1;
-            draft.state.ui.activeWindowId = id;
+        if (!draft.state.ui.windows[id] || draft.state.ui.activeWindowId === id) return;
+        draft.state.ui.windows[id].isMinimized = false;
+        draft.state.ui.windows[id].zIndex = draft.state.ui.nextZIndex;
+        draft.state.ui.nextZIndex += 1;
+        draft.state.ui.activeWindowId = id;
+    })),
+     updateWindowState: (id, updates) => set(produce(draft => {
+        const win = draft.state.ui.windows[id];
+        if (win) {
+            Object.assign(win, updates);
         }
     })),
     setTheme: (themeName) => set(produce(draft => { draft.state.ui.desktopSettings.theme = themeName; })),
+    setAccentColor: (color) => set(produce(draft => { draft.state.ui.desktopSettings.accentColor = color; })),
+    setTaskbarPosition: (position) => set(produce(draft => { draft.state.ui.desktopSettings.taskbarPosition = position; })),
     setWallpaper: (wallpaperUrl) => {
         localStorage.setItem('datacenter_wallpaper', wallpaperUrl);
         set(produce(draft => { draft.state.ui.desktopSettings.wallpaper = wallpaperUrl; }));
     },
-    updateWindowState: (id, updates) => set(produce(draft => {
-        if (draft.state.ui.windows[id]) {
-            if (updates.position) draft.state.ui.windows[id].position = updates.position;
-            if (updates.size) draft.state.ui.windows[id].size = updates.size;
-        }
-    })),
     updateIconPosition: (appId, position) => set(produce(draft => {
-        const icon = draft.state.ui.desktopIcons.find(icon => icon.appId === appId);
+        const icon = draft.state.ui.desktopIcons.find(i => i.appId === appId);
         if (icon) {
             icon.position = position;
         }
@@ -182,19 +244,6 @@ const useGameStore = create((set, get) => ({
     // --- Finances ---
     spendCash: (amount) => set(produce(draft => { draft.state.finances.cash -= amount; })),
     addCash: (amount) => set(produce(draft => { draft.state.finances.cash += amount; })),
-    purchaseAndStageItem: (item, quantity) => set(produce(draft => {
-        const totalCost = item.price * quantity;
-        if (draft.state.finances.cash >= totalCost) {
-            draft.state.finances.cash -= totalCost;
-            for (let i = 0; i < quantity; i++) {
-                const stagedId = `${item.id}_${Date.now() + i}`;
-                draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
-            }
-            get().addEventLog(`Purchased and staged ${quantity} x ${item.name}.`, 'Commerce');
-        } else {
-            get().addEventLog(`Purchase failed. Not enough cash for ${quantity} x ${item.name}.`, 'Error');
-        }
-    })),
     processMonthlyBilling: () => set(produce(draft => {
         const { network, employees, power, time } = draft.state;
         const ispCost = network.ispContract ? network.ispContract.monthlyCost : 0;
@@ -209,16 +258,32 @@ const useGameStore = create((set, get) => ({
         draft.state.lastMonth = time.getMonth();
         get().addEventLog(`Monthly billing processed. Revenue: $${totalRevenue.toFixed(2)}, Expenses: $${totalExpenses.toFixed(2)}`, 'Finance');
     })),
+    addHistoryPoint: () => set(produce(draft => {
+        const now = draft.state.time.getTime();
+        const { cashHistory } = draft.state.finances;
+        const { powerHistory, tempHistory } = draft.state.history;
+
+        cashHistory.push({ time: now, cash: draft.state.finances.cash });
+        if(cashHistory.length > 200) cashHistory.shift();
+        
+        powerHistory.push({ time: now, load: draft.state.power.load });
+        if(powerHistory.length > 200) powerHistory.shift();
+
+        tempHistory.push({ time: now, temp: draft.state.serverRoomTemp });
+        if(tempHistory.length > 200) tempHistory.shift();
+    })),
 
     // --- Inventory & Hardware ---
-    // addToInventory is no longer used for purchases, but kept for save game compatibility
-    addToInventory: (item, count = 1) => set(produce(draft => {
-        draft.state.inventory[item.id] = (draft.state.inventory[item.id] || 0) + count;
-    })),
-    stageHardware: (task) => set(produce(draft => {
-        const stagedId = `${task.onCompleteEffect.item}_${Date.now()}`;
-        draft.state.stagedHardware.push({ id: stagedId, type: task.onCompleteEffect.item, location: 'Tech Room' });
-        get().addEventLog(`Hardware staged: ${task.onCompleteEffect.item}`);
+    purchaseAndStageItem: (item, quantity) => set(produce(draft => {
+        const totalCost = item.price * quantity;
+        if (draft.state.finances.cash >= totalCost) {
+            draft.state.finances.cash -= totalCost;
+            for (let i = 0; i < quantity; i++) {
+                const stagedId = `${item.id}_${Date.now()}_${Math.random()}`;
+                draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
+            }
+            get().addEventLog(`Purchased ${quantity} x ${item.name}.`);
+        }
     })),
     installHardware: (task, itemDetails) => set(produce(draft => {
         const stagedItemIndex = draft.state.stagedHardware.findIndex(h => h.id === task.requiredStaged);
@@ -282,17 +347,6 @@ const useGameStore = create((set, get) => ({
     createTask: (taskDef) => set(produce(draft => {
         const taskId = `task_${Date.now()}`;
         const newTask = { ...taskDef, id: taskId, status: 'Pending', assignedTo: null, completionTime: null };
-        
-        if (taskDef.requiredHardware) {
-            for (const [itemId, count] of Object.entries(taskDef.requiredHardware)) {
-                if (draft.state.inventory[itemId] >= count) {
-                    draft.state.inventory[itemId] -= count;
-                } else {
-                    get().addEventLog(`Not enough ${itemId} in inventory.`, "Error");
-                    return;
-                }
-            }
-        }
         draft.state.tasks.push(newTask);
         get().addEventLog(`New task created: ${taskDef.description}`);
     })),
@@ -407,6 +461,14 @@ const useGameStore = create((set, get) => ({
     })),
     deleteScript: (id) => set(produce(draft => {
         delete draft.state.scripting.scripts[id];
+    })),
+     deployDaemon: (serverId, config) => set(produce(draft => {
+        draft.state.scripting.daemons[serverId] = config;
+        get().addEventLog(`Monitoring daemon deployed to ${serverId}.`, 'Automation');
+    })),
+    removeDaemon: (serverId) => set(produce(draft => {
+        delete draft.state.scripting.daemons[serverId];
+        get().addEventLog(`Monitoring daemon removed from ${serverId}.`, 'Automation');
     })),
     addToast: (title, message) => set(produce(draft => {
         const id = `toast_${Date.now()}`;
