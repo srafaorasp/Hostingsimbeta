@@ -1,145 +1,113 @@
-import React, { useCallback, useRef } from 'react';
-import { motion, useDragControls } from 'framer-motion';
+import React, { useState, useRef, useCallback } from 'react';
 import useGameStore from '/src/store/gameStore.js';
 
-const Window = ({ id, title, children, zIndex, isActive, isMaximized, position, size }) => {
-    const { closeWindow, minimizeWindow, maximizeWindow, focusWindow, updateWindowState } = useGameStore.getState();
-    const dragControls = useDragControls();
+const Window = ({ id, title, children, zIndex, isActive, isMaximized, onClose, onMinimize, onMaximize, onFocus, initialSize, initialPosition }) => {
+    const updateWindowState = useGameStore(state => state.updateWindowState);
+    const [position, setPosition] = useState(initialPosition);
+    const [size, setSize] = useState(initialSize);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isResizing, setIsResizing] = useState(false);
+    const dragStartPos = useRef({ x: 0, y: 0 });
+    const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-    // --- DEFINITIVE FIX for Window Snapping ---
-    const handleDragEnd = (event, info) => {
-        // We calculate the new position by adding the final drag offset to the window's starting position.
-        // This provides a stable and correct final position.
-        const newPosition = {
-            x: position.x + info.offset.x,
-            y: position.y + info.offset.y,
-        };
-        updateWindowState(id, { position: newPosition });
-    };
+    const headerClasses = isMaximized ? 'cursor-default' : 'cursor-move';
+    const windowClasses = isMaximized
+        ? 'top-0 left-0 w-full h-[calc(100%-3rem)] rounded-none'
+        : 'rounded-lg';
 
-    // --- DEFINITIVE FIX for Resizing Logic ---
-    const resizeStartRef = useRef(null);
+    // --- Dragging Logic ---
+    const handleDragMove = useCallback((e) => {
+        if (isMaximized) return;
+        e.preventDefault();
+        const event = e.touches ? e.touches[0] : e;
+        setPosition({ x: event.clientX - dragStartPos.current.x, y: event.clientY - dragStartPos.current.y });
+    }, [isMaximized]);
 
+    const handleDragEnd = useCallback(() => {
+        setIsDragging(false);
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        document.removeEventListener('touchmove', handleDragMove);
+        document.removeEventListener('touchend', handleDragEnd);
+        // Save final position to global state
+        updateWindowState(id, { position });
+    }, [handleDragMove, id, position, updateWindowState]);
+
+    const handleDragStart = useCallback((e) => {
+        if (isMaximized) return;
+        onFocus(id);
+        setIsDragging(true);
+        const event = e.touches ? e.touches[0] : e;
+        dragStartPos.current = { x: event.clientX - position.x, y: event.clientY - position.y };
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchmove', handleDragMove, { passive: false });
+        document.addEventListener('touchend', handleDragEnd);
+    }, [id, onFocus, position, isMaximized, handleDragMove, handleDragEnd]);
+
+    // --- Resizing Logic ---
     const handleResizeMove = useCallback((e) => {
-        if (!resizeStartRef.current) return;
-
-        const { startSize, startPosition, direction } = resizeStartRef.current;
-        const dx = e.clientX - resizeStartRef.current.x;
-        const dy = e.clientY - resizeStartRef.current.y;
-
-        let newWidth = startSize.width;
-        let newHeight = startSize.height;
-        let newX = startPosition.x;
-        let newY = startPosition.y;
-
-        // Apply size changes
-        if (direction.includes('right')) newWidth = Math.max(300, startSize.width + dx);
-        if (direction.includes('bottom')) newHeight = Math.max(200, startSize.height + dy);
-        if (direction.includes('left')) newWidth = Math.max(300, startSize.width - dx);
-        if (direction.includes('top')) newHeight = Math.max(200, startSize.height - dy);
-
-        // Apply position changes for left/top drags
-        if (direction.includes('left') && newWidth > 300) newX = startPosition.x + dx;
-        if (direction.includes('top') && newHeight > 200) newY = startPosition.y + dy;
-
-        updateWindowState(id, {
-            size: { width: newWidth, height: newHeight },
-            position: { x: newX, y: newY }
+        const newWidth = resizeStartPos.current.width + (e.clientX - resizeStartPos.current.x);
+        const newHeight = resizeStartPos.current.height + (e.clientY - resizeStartPos.current.y);
+        setSize({
+            width: Math.max(300, newWidth),
+            height: Math.max(200, newHeight)
         });
-    }, [id, updateWindowState]);
+    }, []);
 
     const handleResizeEnd = useCallback(() => {
-        document.documentElement.style.cursor = '';
+        setIsResizing(false);
         document.removeEventListener('mousemove', handleResizeMove);
         document.removeEventListener('mouseup', handleResizeEnd);
-        resizeStartRef.current = null;
-    }, [handleResizeMove]);
+        // Save final size to global state
+        updateWindowState(id, { size });
+    }, [handleResizeMove, id, size, updateWindowState]);
 
-    const handleResizeStart = useCallback((e, direction) => {
-        e.stopPropagation();
-        focusWindow(id);
-        
-        document.documentElement.style.cursor = `${direction}-resize`;
-
-        resizeStartRef.current = {
+    const handleResizeStart = useCallback((e) => {
+        onFocus(id);
+        setIsResizing(true);
+        resizeStartPos.current = {
             x: e.clientX,
             y: e.clientY,
-            startSize: size,
-            startPosition: position,
-            direction: direction,
+            width: size.width,
+            height: size.height
         };
-        
         document.addEventListener('mousemove', handleResizeMove);
-        document.addEventListener('mouseup', handleResizeEnd, { once: true });
-    }, [id, focusWindow, size, position, handleResizeMove, handleResizeEnd]);
-
-
-    const resizeHandles = [
-        { direction: 'n', className: 'top-0 left-1/2 -translate-x-1/2 h-2 w-[calc(100%-1rem)] cursor-n-resize' },
-        { direction: 's', className: 'bottom-0 left-1/2 -translate-x-1/2 h-2 w-[calc(100%-1rem)] cursor-s-resize' },
-        { direction: 'e', className: 'right-0 top-1/2 -translate-y-1/2 w-2 h-[calc(100%-1rem)] cursor-e-resize' },
-        { direction: 'w', className: 'left-0 top-1/2 -translate-y-1/2 w-2 h-[calc(100%-1rem)] cursor-w-resize' },
-        { direction: 'nw', className: 'top-0 left-0 h-3 w-3 cursor-nw-resize' },
-        { direction: 'ne', className: 'top-0 right-0 h-3 w-3 cursor-ne-resize' },
-        { direction: 'sw', className: 'bottom-0 left-0 h-3 w-3 cursor-sw-resize' },
-        { direction: 'se', className: 'bottom-0 right-0 h-3 w-3 cursor-se-resize' },
-    ];
-
+        document.addEventListener('mouseup', handleResizeEnd);
+    }, [id, onFocus, size, handleResizeMove, handleResizeEnd]);
 
     return (
-        <motion.div
-            key={id}
-            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden text-gray-200 ${isActive ? 'shadow-accent/50' : 'shadow-black/50'} ${isMaximized ? 'rounded-none' : 'rounded-lg'}`}
-            style={{ 
-                zIndex,
-                // We now exclusively use transforms for positioning
-                x: position.x,
-                y: position.y,
-                width: size.width,
-                height: size.height,
-            }}
-            animate={{
+        <div
+            className={`absolute bg-gray-800 border border-gray-700 shadow-2xl flex flex-col overflow-hidden duration-100 ease-out text-gray-200 ${isActive ? 'shadow-lg shadow-blue-500/75' : 'shadow-black/50'} ${windowClasses}`}
+            style={{
+                top: isMaximized ? 0 : position.y,
+                left: isMaximized ? 0 : position.x,
                 width: isMaximized ? '100%' : size.width,
-                height: isMaximized ? `calc(100vh - 7rem)` : size.height,
-                x: isMaximized ? 0 : position.x,
-                y: isMaximized ? 0 : position.y,
+                height: isMaximized ? 'calc(100vh - 3rem)' : size.height,
+                zIndex: zIndex,
+                userSelect: isDragging || isResizing ? 'none' : 'auto'
             }}
-            initial={{ opacity: 0, scale: 0.9 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.1, ease: "easeOut" }}
-            drag={!isMaximized}
-            dragListener={false}
-            dragControls={dragControls}
-            onDragEnd={handleDragEnd}
-            onMouseDown={() => focusWindow(id)}
+            onClick={() => onFocus(id)}
         >
             <header
-                onPointerDown={(event) => {
-                    if (event.target === event.currentTarget) {
-                        dragControls.start(event);
-                    }
-                }}
-                className={`bg-gray-900 text-white p-2 flex justify-between items-center select-none ${!isMaximized ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'} ${isActive ? 'bg-accent/80' : ''}`}
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+                className={`bg-gray-900 text-white p-2 flex justify-between items-center ${headerClasses} ${isActive ? 'bg-blue-800' : ''}`}
             >
-                <span className="font-bold text-sm pointer-events-none">{title}</span>
+                <span className="font-bold text-sm">{title}</span>
                 <div className="flex items-center space-x-2">
-                    <button onClick={() => minimizeWindow(id)} className="w-4 h-4 bg-yellow-500 rounded-full hover:bg-yellow-400"></button>
-                    <button onClick={() => maximizeWindow(id)} className="w-4 h-4 bg-green-500 rounded-full hover:bg-green-400"></button>
-                    <button onClick={() => closeWindow(id)} className="w-4 h-4 bg-red-500 rounded-full hover:bg-red-400"></button>
+                    <button onClick={() => onMinimize(id)} className="w-4 h-4 bg-yellow-500 rounded-full hover:bg-yellow-400"></button>
+                    <button onClick={() => onMaximize(id)} className="w-4 h-4 bg-green-500 rounded-full hover:bg-green-400"></button>
+                    <button onClick={() => onClose(id)} className="w-4 h-4 bg-red-500 rounded-full hover:bg-red-400"></button>
                 </div>
             </header>
-            <main className="flex-grow overflow-y-auto p-1 bg-gray-800/80">
+            <main className="flex-grow overflow-y-auto p-1">
                 {children}
             </main>
-            
-            {!isMaximized && resizeHandles.map(handle => (
-                <div
-                    key={handle.direction}
-                    className={`absolute ${handle.className} z-10`}
-                    onMouseDown={(e) => handleResizeStart(e, handle.direction)}
-                />
-            ))}
-        </motion.div>
+            {!isMaximized && (
+                <div onMouseDown={handleResizeStart} className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize" />
+            )}
+        </div>
     );
 };
 

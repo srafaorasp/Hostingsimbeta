@@ -1,21 +1,20 @@
 import React, { useState } from 'react';
-import useGameStore from '/src/store/gameStore.js';
+import useGameStore from '../store/gameStore.js';
 import { shallow } from 'zustand/shallow';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.jsx';
 import WindowPreview from './WindowPreview.jsx';
 
 const Taskbar = ({ appsConfig }) => {
-    // --- THIS IS THE FIX ---
-    // All state selections are now safe, using optional chaining and default values
-    // to prevent crashes if the state is not ready on the initial render.
-    const time = useGameStore(s => s.state?.time);
-    const cash = useGameStore(s => s.state.finances?.cash ?? 0);
-    const isPaused = useGameStore(s => s.state?.isPaused ?? true);
-    const gameSpeed = useGameStore(s => s.state?.gameSpeed ?? 1);
-    const openWindows = useGameStore(s => s.state.ui?.windows ?? {});
-    const activeWindowId = useGameStore(s => s.state.ui?.activeWindowId);
-    const taskbarPosition = useGameStore(s => s.state.ui?.desktopSettings?.taskbarPosition);
+    // 1. Use targeted, granular hooks for each piece of state that needs to be reactive.
+    const time = useGameStore(s => s.state.time);
+    const cash = useGameStore(s => s.state.finances.cash);
+    const isPaused = useGameStore(s => s.state.isPaused);
+    const gameSpeed = useGameStore(s => s.state.gameSpeed);
+    const openWindows = useGameStore(s => s.state.ui.windows, shallow);
+    const activeWindowId = useGameStore(s => s.state.ui.activeWindowId);
+    const taskbarPosition = useGameStore(s => s.state.ui.desktopSettings.taskbarPosition);
 
+    // 2. Get stable actions non-reactively.
     const { togglePause, setGameSpeed, focusWindow } = useGameStore.getState();
 
     const [hoveredId, setHoveredId] = useState(null);
@@ -41,34 +40,41 @@ const Taskbar = ({ appsConfig }) => {
             {Object.values(openWindows).filter(w => w.isOpen).map(win => {
               if (!appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
               const IconComponent = appsConfig[win.appId].icon;
+              const previewPosition = taskbarPosition === 'top' ? 'top-full mt-2' : 'bottom-full mb-2';
+
               return (
-                <TooltipProvider key={win.id} delayDuration={300}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <div onMouseEnter={() => setHoveredId(win.id)} onMouseLeave={() => setHoveredId(null)}>
+                <div 
+                    key={win.id}
+                    className="relative"
+                    onMouseEnter={() => setHoveredId(win.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                >
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
                                 <button onClick={() => handleTaskbarClick(win.id)} className={`p-1 rounded-md hover:bg-gray-700 ${activeWindowId === win.id && !win.isMinimized ? 'bg-accent' : ''}`}>
                                   <IconComponent />
                                 </button>
-                                {hoveredId === win.id && !win.isMinimized && (
-                                    <div className={`absolute ${taskbarPosition === 'top' ? 'top-full mt-2' : 'bottom-full mb-2'} left-1/2 -translate-x-1/2`}>
-                                        <WindowPreview window={win} />
-                                    </div>
-                                )}
-                             </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{win.title}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{win.title}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    {hoveredId === win.id && !win.isMinimized && (
+                        <div className={`absolute left-1/2 -translate-x-1/2 ${previewPosition}`}>
+                            <WindowPreview window={win} />
+                        </div>
+                    )}
+                </div>
               );
             })}
           </div>
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
             <div className="font-mono text-sm text-center">
-              {/* Added optional chaining to prevent crash if time is not yet loaded */}
-              <div>{time?.toLocaleDateString()}</div>
-              <div>{time?.toLocaleTimeString()}</div>
+              <div>{time.toLocaleDateString()}</div>
+              <div>{time.toLocaleTimeString()}</div>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={togglePause} className="font-bold text-lg px-2">{isPaused ? '▶' : '❚❚'}</button>
