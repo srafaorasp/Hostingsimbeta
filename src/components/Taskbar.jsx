@@ -1,93 +1,80 @@
-import React, { useState } from 'react';
-import useGameStore from '../store/gameStore.js';
-import { shallow } from 'zustand/shallow';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.jsx';
-import WindowPreview from './WindowPreview.jsx';
+import React, { useState, useEffect } from 'react';
+import useGameStore from '../store/gameStore';
+import Icons from './Icons';
+import StartMenu from './StartMenu'; // Assuming StartMenu is in the same directory
 
-const Taskbar = ({ appsConfig }) => {
-    // 1. Use targeted, granular hooks for each piece of state that needs to be reactive.
-    const time = useGameStore(s => s.state.time);
-    const cash = useGameStore(s => s.state.finances.cash);
-    const isPaused = useGameStore(s => s.state.isPaused);
-    const gameSpeed = useGameStore(s => s.state.gameSpeed);
-    const openWindows = useGameStore(s => s.state.ui.windows, shallow);
-    const activeWindowId = useGameStore(s => s.state.ui.activeWindowId);
-    const taskbarPosition = useGameStore(s => s.state.ui.desktopSettings.taskbarPosition);
+const Taskbar = () => {
+    const { windows, toggleWindow, bringToFront, appsConfig } = useGameStore();
+    const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
-    // 2. Get stable actions non-reactively.
-    const { togglePause, setGameSpeed, focusWindow } = useGameStore.getState();
+    const gameTime = useGameStore(state => state.gameTime);
 
-    const [hoveredId, setHoveredId] = useState(null);
-    
-    const speeds = [
-        { label: '1x', value: 1 },
-        { label: '1m', value: 60 },
-        { label: '5m', value: 300 },
-        { label: '1h', value: 3600 }
-    ];
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000); // Update every second
+        return () => clearInterval(timer);
+    }, []);
 
-    const handleTaskbarClick = (id) => {
-        focusWindow(id);
+    const handleAppClick = (appId) => {
+        toggleWindow(appId);
+        bringToFront(appId);
     };
 
-    const taskbarClasses = `absolute left-0 right-0 h-12 bg-gray-900/80 backdrop-blur-sm text-white flex items-center justify-between px-4 z-[1000] ${
-        taskbarPosition === 'top' ? 'top-0 border-b border-gray-700' : 'bottom-0 border-t border-gray-700'
-    }`;
-    
+    const formatGameTime = (date) => {
+        const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return date.toLocaleDateString("en-US", options);
+    }
+
+    const formatRealTime = (date) => {
+        return date.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+    }
+
     return (
-        <div className={taskbarClasses}>
-          <div className="flex items-center space-x-2 h-full">
-            {Object.values(openWindows).filter(w => w.isOpen).map(win => {
-              if (!appsConfig[win.appId] || !appsConfig[win.appId].icon) return null;
-              const IconComponent = appsConfig[win.appId].icon;
-              const previewPosition = taskbarPosition === 'top' ? 'top-full mt-2' : 'bottom-full mb-2';
+        <>
+            {isStartMenuOpen && <StartMenu closeMenu={() => setIsStartMenuOpen(false)} />}
+            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gray-800 bg-opacity-90 backdrop-blur-sm flex items-center justify-between px-2 z-50 border-t border-gray-700">
+                <div className="flex items-center">
+                    {/* Start Button */}
+                    <button
+                        onClick={() => setIsStartMenuOpen(!isStartMenuOpen)}
+                        className="px-3 py-1 bg-green-500 hover:bg-green-600 rounded text-white font-bold"
+                    >
+                        Start
+                    </button>
 
-              return (
-                <div 
-                    key={win.id}
-                    className="relative"
-                    onMouseEnter={() => setHoveredId(win.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                >
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button onClick={() => handleTaskbarClick(win.id)} className={`p-1 rounded-md hover:bg-gray-700 ${activeWindowId === win.id && !win.isMinimized ? 'bg-accent' : ''}`}>
-                                  <IconComponent />
+                    {/* Pinned/Open Apps */}
+                    <div className="flex items-center ml-2 space-x-1">
+                        {Object.keys(windows).map((appId) => {
+                            const app = appsConfig[appId];
+                            if (!app) return null;
+                            const Icon = app.icon;
+                            const isActive = windows[appId].isOpen;
+                            return (
+                                <button
+                                    key={appId}
+                                    onClick={() => handleAppClick(appId)}
+                                    className={`p-2 rounded hover:bg-gray-700 ${isActive ? 'bg-gray-600' : ''}`}
+                                    title={app.title}
+                                >
+                                    <Icon className="w-5 h-5 text-white" />
                                 </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{win.title}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-
-                    {hoveredId === win.id && !win.isMinimized && (
-                        <div className={`absolute left-1/2 -translate-x-1/2 ${previewPosition}`}>
-                            <WindowPreview window={win} />
-                        </div>
-                    )}
+                            );
+                        })}
+                    </div>
                 </div>
-              );
-            })}
-          </div>
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
-            <div className="font-mono text-sm text-center">
-              <div>{time.toLocaleDateString()}</div>
-              <div>{time.toLocaleTimeString()}</div>
+
+                {/* System Tray */}
+                <div className="flex items-center text-xs text-gray-300 space-x-2 pr-2">
+                    <div className="text-right">
+                        <div>{formatRealTime(currentTime)}</div>
+                        <div>{formatGameTime(gameTime)}</div>
+                    </div>
+                </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={togglePause} className="font-bold text-lg px-2">{isPaused ? '▶' : '❚❚'}</button>
-              <div className="flex gap-1">
-                {speeds.map(s => (
-                  <button key={s.label} onClick={() => setGameSpeed(s.value)} className={`px-2 py-0.5 text-xs rounded ${gameSpeed === s.value ? 'bg-accent' : 'bg-gray-700'}`}>{s.label}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="font-mono text-lg text-green-400">${cash.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-        </div>
-      );
+        </>
+    );
 };
 
 export default Taskbar;

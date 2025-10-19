@@ -91,3 +91,18 @@ export const TASK_DEFINITIONS = [
     { id: 'repair_hardware', description: 'Repair Failed Hardware', requiredSkill: 'Hardware Technician', durationMinutes: 180, location: 'Server Room', needsTarget: 'SERVER_FAILED', onCompleteEffect: { action: 'BRING_ONLINE' } },
 ];
 
+export const startingScenarios = [
+  {
+    id: 'vc-startup',
+    name: 'VC Backed Startup',
+    description: 'Start with a healthy amount of cash, but with high expectations.',
+    startingCash: 50000,
+  },
+  {
+    id: 'bootstrapped',
+    name: 'Bootstrapped',
+    description: 'A humble beginning. Every dollar counts.',
+    startingCash: 5000,
+  },
+];
+
