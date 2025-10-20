@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useGameStore from './store/gameStore';
 import useGameLoop from './hooks/useGameLoop';
 import LoginScreen from './components/LoginScreen';
@@ -28,10 +28,17 @@ function App() {
     windows,
     openWindow,
     setWallpaper,
-    hasError
+    hasError,
+    loadGame, // Get the loadGame action
   } = useGameStore();
 
   useGameLoop(); // Start the game loop
+
+  // Load the game data when the app component mounts
+  useEffect(() => {
+    loadGame();
+  }, [loadGame]);
+
 
   const [isStartMenuOpen, setStartMenuOpen] = useState(false);
 

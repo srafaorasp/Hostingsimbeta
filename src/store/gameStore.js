@@ -1,490 +1,260 @@
 import { create } from 'zustand';
-import { produce } from 'immer';
-import { HARDWARE_CATALOG, ISP_CONTRACTS, CLIENT_CONTRACTS, SCRIPT_PERMISSIONS, APPS_CONFIG, GRID_POWER_COST_PER_KWH } from '../data.js';
+import { immer } from 'zustand/middleware/immer';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { nanoid } from 'nanoid';
+import localforage from 'localforage';
+import { APPS_CONFIG, startingScenarios, TASKS_CONFIG } from '../data';
+import dayjs from 'dayjs';
 
-// Helper function to create a fresh initial state
-const createInitialState = () => ({
-    time: new Date(2025, 8, 29, 8, 0, 0),
-    lastMonth: 8,
-    isPaused: true,
-    isBooted: false,
-    gameSpeed: 1,
-    hasCrashed: false, // NEW: BSOD state
-    crashError: null,  // NEW: Store error info
-    finances: { 
-        cash: 75000, 
-        monthlyRevenue: 0, 
-        lastBill: 0,
-        cashHistory: [],
-    },
-    history: {
-        powerHistory: [],
-        tempHistory: [],
-    },
-    stagedHardware: [],
-    employees: [],
-    tasks: [],
-    dataCenterLayout: {},
-    nextRackSlot: 1,
-    power: { capacity: 0, load: 0, gridActive: true, totalConsumedKwh: 0 },
-    cooling: { capacity: 0, load: 0 },
-    serverRoomTemp: 21.0,
-    network: { capacity: 0, load: 0, ispContract: null, publicIpBlock: null, assignedPublicIps: {} },
-    nextInternalIp: 10,
-    activeContracts: [],
-    eventLog: [{ id: Date.now(), time: new Date(), message: "System OS booted successfully." }],
-    ui: {
-        desktopSettings: {
-            theme: 'dark',
-            wallpaper: `url('https://placehold.co/1920x1000/0a1829/1c2a3b?text=DataCenter+OS')`,
-            accentColor: 'blue',
-            taskbarPosition: 'bottom',
-        },
-        windows: {},
-        activeWindowId: null,
-        nextZIndex: 10,
-        lastWindowId: 0,
+const useGameStore = create(
+  persist(
+    immer((set, get) => ({
+      // Core Game State
+      isGameLoaded: false,
+      isLoggedIn: false,
+      hasError: false,
+      gameDate: dayjs().startOf('day').add(8, 'hour').toISOString(),
+      realTime: new Date().toISOString(),
+      timeSpeed: 1, // 1 = normal, 10 = 10x speed, etc.
+      companyName: '',
+      cash: 0,
+      monthlyProfit: 0,
+
+      // UI State
+      ui: {
+        wallpaper: 'bg-blue-900',
         desktopIcons: [],
-    },
-    scripting: {
-        agents: { 'system': { name: 'system', permissions: Object.keys(SCRIPT_PERMISSIONS), isCallable: false } },
-        scripts: {},
-        daemons: {},
-        toasts: [],
-        alerts: [],
-    },
-});
+        windows: {}, // { appId: { isOpen, position, size, zIndex } }
+        nextZIndex: 1,
+        activeWindow: null,
+        toast: { show: false, message: '', type: 'info' },
+      },
 
+      // Game Data
+      logs: [],
+      employees: [],
+      hardware: [], // All hardware assets owned by the player
+      tasks: [],
+      ispContracts: [],
 
-// Helper function for deep merging states, crucial for loading games.
-const deepMerge = (target, source) => {
-    for (const key in source) {
-        if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
-            if (!Array.isArray(source[key])) {
-                 deepMerge(target[key], source[key]);
-            } else {
-                 target[key] = source[key];
-            }
-        } else {
-            target[key] = source[key];
+      // --- ACTIONS --- //
+
+      // Game Lifecycle
+      loadGame: async () => {
+        try {
+          const savedState = await localforage.getItem('gameState');
+          if (savedState) {
+            set((state) => {
+              // Basic merge
+              Object.assign(state, savedState);
+
+              // Ensure nested objects that might be undefined in old saves are present
+              state.ui = { ...get().ui, ...savedState.ui };
+              state.ui.windows = savedState.ui?.windows || {};
+              state.isGameLoaded = true;
+              state.isLoggedIn = true; // Assume if they load, they are logged in
+            });
+            get().addLog('Game loaded successfully.', 'success', { meta: 'system' });
+          } else {
+             // This happens on first ever launch.
+             set({ isGameLoaded: true, isLoggedIn: false });
+          }
+        } catch (error) {
+          console.error("Failed to load game:", error);
+          get().setErrorState(error);
         }
-    }
-    return target;
-};
+      },
 
-
-const useGameStore = create((set, get) => ({
-    state: createInitialState(),
-
-    // --- System & Time ---
-    newGame: () => set(produce(draft => {
-        const initialState = createInitialState();
-        initialState.isBooted = true;
-        initialState.eventLog = [{ id: Date.now(), time: new Date(), message: "New session started." }];
-        initialState.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
-            appId,
-            position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
-        }));
-        draft.state = initialState;
-    })),
-    saveGame: (slotName) => {
-        const dataToSave = get().state;
-        const stateString = JSON.stringify({ ...dataToSave, time: dataToSave.time.toISOString(), eventLog: dataToSave.eventLog.map(e => ({ ...e, time: e.time.toISOString() })) });
-        localStorage.setItem(`datacenter_save_${slotName}`, stateString);
-    },
-    loadGame: (slotName) => {
-        const savedStateJSON = localStorage.getItem(`datacenter_save_${slotName}`);
-        if (savedStateJSON) {
-            const savedData = JSON.parse(savedStateJSON);
-            const wallpaper = localStorage.getItem('datacenter_wallpaper');
-            let freshState = createInitialState();
-            
-            const mergedData = deepMerge(freshState, savedData);
-
-            const rehydratedData = {
-                ...mergedData,
-                isBooted: true,
-                time: new Date(savedData.time || freshState.time),
-                eventLog: (savedData.eventLog || []).map(e => ({ ...e, time: new Date(e.time) })),
-            };
-            if (wallpaper) rehydratedData.ui.desktopSettings.wallpaper = wallpaper;
-
-             if (!rehydratedData.ui.desktopIcons || rehydratedData.ui.desktopIcons.length === 0) {
-                rehydratedData.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
-                    appId,
-                    position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
-                }));
-            }
-
-            set({ state: rehydratedData });
-        }
-    },
-    // --- NEW: Crash Handling ---
-    triggerBSOD: (error, errorInfo) => {
-        // 1. Download Debug Log
-        const fullState = get().state;
-        const stateString = JSON.stringify({
-            error: error.toString(),
-            errorInfo: errorInfo,
-            gameState: { ...fullState, time: fullState.time.toISOString() }
-        }, (key, value) => value instanceof Date ? value.toISOString() : value, 2);
-        
-        const blob = new Blob([stateString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `fatal-error-dump-${new Date().toISOString()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        // 2. Set crash state
-        set(produce(draft => {
-            draft.state.hasCrashed = true;
-            draft.state.crashError = { message: error.toString() };
-            draft.state.isPaused = true;
-        }));
-    },
-    rebootSystem: () => set(produce(draft => {
-        const freshState = createInitialState();
-        freshState.isBooted = true; // Go back to desktop, not login
-        freshState.eventLog = [{ id: Date.now(), time: new Date(), message: "System rebooted after a critical error." }];
-        freshState.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
-            appId,
-            position: { x: 20 + (index % 2) * 110, y: 20 + Math.floor(index / 2) * 110 }
-        }));
-        draft.state = freshState;
-    })),
-    // --- End of new Crash Handling ---
-
-    advanceTime: (seconds) => set(produce(draft => {
-        const newTime = new Date(draft.state.time);
-        newTime.setSeconds(newTime.getSeconds() + seconds);
-        draft.state.time = newTime;
-        const kwhConsumedThisTick = (draft.state.power.load / 1000) * (seconds / 3600);
-        draft.state.power.totalConsumedKwh += kwhConsumedThisTick;
-    })),
-    togglePause: () => set(produce(draft => { draft.state.isPaused = !draft.state.isPaused; })),
-    setGameSpeed: (speed) => set(produce(draft => { draft.state.gameSpeed = speed; })),
-    addEventLog: (message, source = "System") => {
-        const logEntry = { id: Date.now() + Math.random(), time: get().state.time, message: `[${source}] ${message}` };
-        set(produce(draft => {
-            draft.state.eventLog.unshift(logEntry);
-            if (draft.state.eventLog.length > 200) draft.state.eventLog.pop();
-        }));
-    },
-    
-    // --- UI State Management ---
-    openApp: (appId) => set(produce(draft => {
-        const existingWindow = Object.values(draft.state.ui.windows).find(w => w.appId === appId);
-        if (existingWindow) {
-            draft.state.ui.windows[existingWindow.id].isMinimized = false;
-            get().focusWindow(existingWindow.id); 
-            return;
+      newGame: (scenarioId) => {
+        const scenario = startingScenarios.find(s => s.id === scenarioId);
+        if (!scenario) {
+          get().setErrorState(new Error(`Scenario with id ${scenarioId} not found.`));
+          return;
         }
 
-        const newId = `win-${draft.state.ui.lastWindowId + 1}`;
-        draft.state.ui.lastWindowId += 1;
-        draft.state.ui.windows[newId] = {
-            id: newId,
-            appId,
-            title: APPS_CONFIG[appId].title,
-            isOpen: true,
-            isMinimized: false,
-            isMaximized: false,
-            zIndex: draft.state.ui.nextZIndex,
-            position: { x: 50 + (draft.state.ui.lastWindowId % 10) * 20, y: 50 + (draft.state.ui.lastWindowId % 10) * 20 },
-            size: { width: 800, height: 600 }
-        };
-        draft.state.ui.nextZIndex += 1;
-        draft.state.ui.activeWindowId = newId;
-    })),
-    closeWindow: (id) => set(produce(draft => {
-        delete draft.state.ui.windows[id];
-        if (draft.state.ui.activeWindowId === id) draft.state.ui.activeWindowId = null;
-    })),
-    minimizeWindow: (id) => set(produce(draft => {
-        if (draft.state.ui.windows[id]) {
-            draft.state.ui.windows[id].isMinimized = true;
-        }
-        if (draft.state.ui.activeWindowId === id) draft.state.ui.activeWindowId = null;
-    })),
-    maximizeWindow: (id) => set(produce(draft => {
-        if (draft.state.ui.windows[id]) {
-            draft.state.ui.windows[id].isMaximized = !draft.state.ui.windows[id].isMaximized;
-        }
-        get().focusWindow(id);
-    })),
-    focusWindow: (id) => set(produce(draft => {
-        if (!draft.state.ui.windows[id] || draft.state.ui.activeWindowId === id) return;
-        draft.state.ui.windows[id].isMinimized = false;
-        draft.state.ui.windows[id].zIndex = draft.state.ui.nextZIndex;
-        draft.state.ui.nextZIndex += 1;
-        draft.state.ui.activeWindowId = id;
-    })),
-     updateWindowState: (id, updates) => set(produce(draft => {
-        const win = draft.state.ui.windows[id];
-        if (win) {
-            Object.assign(win, updates);
-        }
-    })),
-    setTheme: (themeName) => set(produce(draft => { draft.state.ui.desktopSettings.theme = themeName; })),
-    setAccentColor: (color) => set(produce(draft => { draft.state.ui.desktopSettings.accentColor = color; })),
-    setTaskbarPosition: (position) => set(produce(draft => { draft.state.ui.desktopSettings.taskbarPosition = position; })),
-    setWallpaper: (wallpaperUrl) => {
-        localStorage.setItem('datacenter_wallpaper', wallpaperUrl);
-        set(produce(draft => { draft.state.ui.desktopSettings.wallpaper = wallpaperUrl; }));
-    },
-    updateIconPosition: (appId, position) => set(produce(draft => {
-        const icon = draft.state.ui.desktopIcons.find(i => i.appId === appId);
-        if (icon) {
-            icon.position = position;
-        }
-    })),
-    
-    // --- Finances ---
-    spendCash: (amount) => set(produce(draft => { draft.state.finances.cash -= amount; })),
-    addCash: (amount) => set(produce(draft => { draft.state.finances.cash += amount; })),
-    processMonthlyBilling: () => set(produce(draft => {
-        const { network, employees, power, time } = draft.state;
-        const ispCost = network.ispContract ? network.ispContract.monthlyCost : 0;
-        const employeeSalaries = employees.reduce((acc, emp) => acc + (emp.salary / 12), 0);
-        const powerBill = power.totalConsumedKwh * GRID_POWER_COST_PER_KWH;
-        const totalExpenses = ispCost + employeeSalaries + powerBill;
-        const totalRevenue = draft.state.finances.monthlyRevenue;
-        
-        draft.state.finances.cash += (totalRevenue - totalExpenses);
-        draft.state.finances.lastBill = totalExpenses;
-        draft.state.power.totalConsumedKwh = 0;
-        draft.state.lastMonth = time.getMonth();
-        get().addEventLog(`Monthly billing processed. Revenue: $${totalRevenue.toFixed(2)}, Expenses: $${totalExpenses.toFixed(2)}`, 'Finance');
-    })),
-    addHistoryPoint: () => set(produce(draft => {
-        const now = draft.state.time.getTime();
-        const { cashHistory } = draft.state.finances;
-        const { powerHistory, tempHistory } = draft.state.history;
+         // Reset state to a clean slate before applying scenario
+        set(state => {
+            // Reset core properties
+            state.isLoggedIn = true;
+            state.gameDate = dayjs().startOf('day').add(8, 'hour').toISOString();
+            state.timeSpeed = 1;
+            state.companyName = 'My Hosting Company';
+            state.cash = scenario.startingCash;
+            state.monthlyProfit = 0;
 
-        cashHistory.push({ time: now, cash: draft.state.finances.cash });
-        if(cashHistory.length > 200) cashHistory.shift();
-        
-        powerHistory.push({ time: now, load: draft.state.power.load });
-        if(powerHistory.length > 200) powerHistory.shift();
+            // Reset UI
+            state.ui.wallpaper = 'bg-blue-900';
+            state.ui.desktopIcons = Object.keys(APPS_CONFIG).map((appId, index) => ({
+                id: nanoid(),
+                appId,
+                position: { x: 20, y: 20 + index * 100 },
+            }));
+            state.ui.windows = {};
+            state.ui.nextZIndex = 1;
+            state.ui.activeWindow = null;
 
-        tempHistory.push({ time: now, temp: draft.state.serverRoomTemp });
-        if(tempHistory.length > 200) tempHistory.shift();
-    })),
-
-    // --- Inventory & Hardware ---
-    purchaseAndStageItem: (item, quantity) => set(produce(draft => {
-        const totalCost = item.price * quantity;
-        if (draft.state.finances.cash >= totalCost) {
-            draft.state.finances.cash -= totalCost;
-            for (let i = 0; i < quantity; i++) {
-                const stagedId = `${item.id}_${Date.now()}_${Math.random()}`;
-                draft.state.stagedHardware.push({ id: stagedId, type: item.id, location: 'Tech Room' });
-            }
-            get().addEventLog(`Purchased ${quantity} x ${item.name}.`);
-        }
-    })),
-    installHardware: (task, itemDetails) => set(produce(draft => {
-        const stagedItemIndex = draft.state.stagedHardware.findIndex(h => h.id === task.requiredStaged);
-        if (stagedItemIndex === -1) {
-            get().addEventLog(`Staged item ${task.requiredStaged} not found for installation.`, 'Error');
-            return;
-        }
-        
-        const [stagedItem] = draft.state.stagedHardware.splice(stagedItemIndex, 1);
-        const newItem = { id: stagedItem.id, type: stagedItem.type, status: 'INSTALLED' };
-
-        if (itemDetails.type === 'RACK') {
-             const slotId = `A${draft.state.nextRackSlot++}`;
-             draft.state.dataCenterLayout[slotId] = { ...newItem, contents: [] };
-        } else if (task.targetLocation && draft.state.dataCenterLayout[task.targetLocation]) {
-             draft.state.dataCenterLayout[task.targetLocation].contents.push(newItem);
-        } else {
-            get().addEventLog(`Target location ${task.targetLocation} not found for hardware installation.`, 'Error');
-            draft.state.stagedHardware.push(stagedItem); // Return item to staged
-            return;
-        }
-        get().addEventLog(`${itemDetails.name} installed.`);
-    })),
-    bringHardwareOnline: (task) => set(produce(draft => {
-        const rack = Object.values(draft.state.dataCenterLayout).find(r => r.contents?.some(d => d.id === task.targetItem));
-        if (rack) {
-            const device = rack.contents.find(d => d.id === task.targetItem);
-            if (device) device.status = 'ONLINE';
-        }
-    })),
-    connectRackToPdu: (task) => set(produce(draft => {
-       if(draft.state.dataCenterLayout[task.targetLocation]) {
-           draft.state.dataCenterLayout[task.targetLocation].pdu = task.targetPdu;
-       }
-    })),
-    configureLan: (task) => set(produce(draft => {
-        const rack = Object.values(draft.state.dataCenterLayout).find(r => r.contents?.some(d => d.id === task.targetItem));
-        if (rack) {
-            const device = rack.contents.find(d => d.id === task.targetItem);
-            if (device) {
-                device.status = 'LAN_CONFIGURED';
-                device.hostname = task.hostname;
-                device.internalIp = task.ip;
-                draft.state.nextInternalIp++;
-            }
-        }
-    })),
-    configureWan: (task) => set(produce(draft => {
-        const rack = Object.values(draft.state.dataCenterLayout).find(r => r.contents?.some(d => d.id === task.targetItem));
-        if (rack) {
-            const device = rack.contents.find(d => d.id === task.targetItem);
-            if (device) {
-                device.status = 'NETWORKED';
-                device.publicIp = task.publicIp;
-                draft.state.network.assignedPublicIps[device.id] = task.publicIp;
-            }
-        }
-    })),
-
-    // --- Task & Employee Management ---
-    createTask: (taskDef) => set(produce(draft => {
-        const taskId = `task_${Date.now()}`;
-        const newTask = { ...taskDef, id: taskId, status: 'Pending', assignedTo: null, completionTime: null };
-        draft.state.tasks.push(newTask);
-        get().addEventLog(`New task created: ${taskDef.description}`);
-    })),
-    abortTask: (taskId) => set(produce(draft => {
-        const taskIndex = draft.state.tasks.findIndex(t => t.id === taskId);
-        if (taskIndex > -1) {
-            const task = draft.state.tasks[taskIndex];
-            if (task.assignedTo) {
-                const employee = draft.state.employees.find(e => e.id === task.assignedTo);
-                if (employee) {
-                    employee.status = 'Idle';
-                    employee.assignedTaskId = null;
-                }
-            }
-            draft.state.tasks.splice(taskIndex, 1);
-            get().addEventLog(`Task aborted: ${task.description}`);
-        }
-    })),
-    updateTask: (taskId, updates) => set(produce(draft => {
-        const task = draft.state.tasks.find(t => t.id === taskId);
-        if (task) Object.assign(task, updates);
-    })),
-    removeTask: (taskId) => set(produce(draft => {
-        draft.state.tasks = draft.state.tasks.filter(t => t.id !== taskId);
-    })),
-    updateEmployee: (employeeId, updates) => set(produce(draft => {
-        const employee = draft.state.employees.find(e => e.id === employeeId);
-        if (employee) Object.assign(employee, updates);
-    })),
-    hireEmployee: (employee) => set(produce(draft => {
-        draft.state.employees.push({ ...employee, status: 'Idle', assignedTaskId: null, location: 'Break Room' });
-        get().addEventLog(`${employee.name} has been hired.`);
-    })),
-
-    // --- Core Gameplay Functions ---
-    signIspContract: (contract, cidr) => set(produce(draft => {
-        if (draft.state.network.ispContract) {
-            get().addEventLog("An ISP contract is already active.", "Error");
-            return;
-        }
-        const [baseIp, prefix] = cidr.split('/');
-        const numAddresses = Math.pow(2, 32 - parseInt(prefix)) - 2;
-        const ips = Array.from({ length: numAddresses }, (_, i) => {
-            const ipParts = baseIp.split('.').map(Number);
-            ipParts[3] += (i + 1);
-            return ipParts.join('.');
+            // Reset Data
+            state.logs = [];
+            state.employees = scenario.startingStaff;
+            state.hardware = scenario.startingHardware;
+            state.tasks = [];
+            state.ispContracts = [];
         });
 
-        draft.state.network.ispContract = contract;
-        draft.state.network.publicIpBlock = { cidr, ips };
-        draft.state.finances.cash -= contract.monthlyCost;
-        get().addEventLog(`Signed contract with ${contract.name}. Leased IP block ${cidr}.`, "Network");
-    })),
-    acceptContract: (contractId) => set(produce(draft => {
-        if (draft.state.activeContracts.includes(contractId)) return;
-        const contract = CLIENT_CONTRACTS.find(c => c.id === contractId);
-        if (contract) {
-            draft.state.activeContracts.push(contractId);
-            draft.state.finances.monthlyRevenue += contract.monthlyRevenue;
-            get().addEventLog(`Accepted contract: ${contract.name}.`, 'Client');
+
+        get().addLog(`New game started with the "${scenario.name}" scenario.`, 'info', { meta: 'system' });
+        set({ isGameLoaded: true });
+      },
+
+      // Time Management
+      advanceTime: (minutes) => {
+        set((state) => {
+          state.gameDate = dayjs(state.gameDate).add(minutes, 'minute').toISOString();
+          state.realTime = new Date().toISOString();
+        });
+        // Here you would trigger checks for events, task progress, etc.
+        get().updateTasks();
+      },
+
+       updateTasks: () => {
+        set(state => {
+            const now = dayjs(state.gameDate);
+            const completedTasks = [];
+
+            state.tasks = state.tasks.filter(task => {
+                if (task.status === 'completed' || task.status === 'failed') return false; // Already done
+
+                const endTime = dayjs(task.startTime).add(task.durationMinutes, 'minute');
+
+                if (now.isAfter(endTime)) {
+                    // Task is complete
+                    task.status = 'completed';
+                    completedTasks.push(task);
+                    return false; // Remove from active tasks
+                }
+                return true; // Keep in active tasks
+            });
+
+            if (completedTasks.length > 0) {
+                 get().addLog(`${completedTasks.length} task(s) completed.`, 'success', { meta: 'tasks' });
+                 // TODO: Handle onCompleteEffect for each task
+            }
+        });
+    },
+
+      // UI Actions
+      openWindow: (appId) => {
+        set((state) => {
+          const { windows, nextZIndex } = state.ui;
+          if (!windows[appId]) {
+            windows[appId] = { isOpen: true, zIndex: nextZIndex };
+          } else {
+            windows[appId].isOpen = true;
+            windows[appId].zIndex = nextZIndex;
+          }
+          state.ui.nextZIndex += 1;
+          state.ui.activeWindow = appId;
+        });
+      },
+
+      closeWindow: (appId) => {
+        set((state) => {
+          if (state.ui.windows[appId]) {
+            state.ui.windows[appId].isOpen = false;
+          }
+          if (state.ui.activeWindow === appId) {
+             // Find the next highest z-index to make active
+             const openWindows = Object.entries(state.ui.windows)
+                .filter(([, win]) => win.isOpen && win.appId !== appId)
+                .sort(([, a], [, b]) => b.zIndex - a.zIndex);
+             state.ui.activeWindow = openWindows.length > 0 ? openWindows[0][0] : null;
+          }
+        });
+      },
+
+       focusWindow: (appId) => {
+        set((state) => {
+          if (state.ui.windows[appId] && state.ui.activeWindow !== appId) {
+            state.ui.windows[appId].zIndex = state.ui.nextZIndex;
+            state.ui.nextZIndex += 1;
+            state.ui.activeWindow = appId;
+          }
+        });
+      },
+
+      setWallpaper: (wallpaperClass) => {
+        set((state) => {
+          state.ui.wallpaper = wallpaperClass;
+        });
+      },
+
+      updateIconPosition: (iconId, position) => {
+        set(state => {
+          const icon = state.ui.desktopIcons.find(i => i.id === iconId);
+          if (icon) {
+            icon.position = position;
+          }
+        });
+      },
+
+      // Logging
+      addLog: (message, type = 'info', metadata = {}) => {
+        set((state) => {
+          state.logs.unshift({
+            id: nanoid(),
+            message,
+            type, // 'info', 'success', 'warning', 'error'
+            gameTimestamp: state.gameDate,
+            realTimestamp: new Date().toISOString(),
+            metadata,
+          });
+          // Optional: Trim logs if they get too long
+          if (state.logs.length > 200) {
+            state.logs.pop();
+          }
+        });
+      },
+
+       // Task Management
+      addTask: (taskId, employeeId, targetId = null) => {
+        const taskConfig = TASKS_CONFIG.find(t => t.id === taskId);
+        if (!taskConfig) {
+            get().addLog(`Attempted to start unknown task: ${taskId}`, 'error');
+            return;
         }
+
+        set(state => {
+            state.tasks.push({
+                id: nanoid(),
+                taskId,
+                employeeId,
+                targetId,
+                status: 'inprogress',
+                startTime: state.gameDate,
+                durationMinutes: taskConfig.durationMinutes,
+            });
+        });
+        get().addLog(`Task started: ${taskConfig.description}`, 'info', { meta: 'tasks' });
+      },
+
+      // Error Handling
+      setErrorState: (error) => {
+        console.error("A critical error occurred:", error);
+        set({ hasError: true });
+      },
+
     })),
-    toggleGridPower: () => set(produce(draft => {
-        draft.state.power.gridActive = !draft.state.power.gridActive;
-        get().addEventLog(`City power grid is now ${draft.state.power.gridActive ? 'ONLINE' : 'OFFLINE'}.`, 'Power');
-    })),
-    updatePowerAndCooling: (power, cooling, temp) => set(produce(draft => {
-        draft.state.power.load = power.totalLoad;
-        draft.state.power.capacity = power.totalCapacity;
-        draft.state.cooling.load = cooling.totalLoad;
-        draft.state.cooling.capacity = cooling.totalCapacity;
-        draft.state.serverRoomTemp = temp;
-    })),
-    
-    // --- Scripting System ---
-    createScriptAgent: (name) => set(produce(draft => {
-        if (!draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name] = { name, permissions: [], isCallable: false };
-        }
-    })),
-    deleteScriptAgent: (name) => set(produce(draft => {
-        if (name === 'system') return;
-        delete draft.state.scripting.agents[name];
-        draft.state.scripting.scripts = Object.fromEntries(Object.entries(draft.state.scripting.scripts).filter(([_, s]) => s.agentName !== name));
-    })),
-    setAgentCallable: (name, isCallable) => set(produce(draft => {
-        if (draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name].isCallable = isCallable;
-        }
-    })),
-    updateAgentPermissions: (name, permissions) => set(produce(draft => {
-        if (draft.state.scripting.agents[name]) {
-            draft.state.scripting.agents[name].permissions = permissions;
-        }
-    })),
-    createScript: (agentName, scriptName) => set(produce(draft => {
-        const id = `script_${Date.now()}`;
-        draft.state.scripting.scripts[id] = {
-            id,
-            agentName,
-            name: scriptName,
-            content: `# ${scriptName} for ${agentName}\n\n`,
-            status: 'paused',
-            interval: 60,
-            lastRunTime: null,
-        };
-    })),
-    updateScript: (id, updates) => set(produce(draft => {
-        if (draft.state.scripting.scripts[id]) {
-            Object.assign(draft.state.scripting.scripts[id], updates);
-        }
-    })),
-    deleteScript: (id) => set(produce(draft => {
-        delete draft.state.scripting.scripts[id];
-    })),
-     deployDaemon: (serverId, config) => set(produce(draft => {
-        draft.state.scripting.daemons[serverId] = config;
-        get().addEventLog(`Monitoring daemon deployed to ${serverId}.`, 'Automation');
-    })),
-    removeDaemon: (serverId) => set(produce(draft => {
-        delete draft.state.scripting.daemons[serverId];
-        get().addEventLog(`Monitoring daemon removed from ${serverId}.`, 'Automation');
-    })),
-    addToast: (title, message) => set(produce(draft => {
-        const id = `toast_${Date.now()}`;
-        draft.state.scripting.toasts.push({ id, title, message });
-    })),
-    removeToast: (id) => set(produce(draft => {
-        draft.state.scripting.toasts = draft.state.scripting.toasts.filter(t => t.id !== id);
-    })),
-    addAlert: (title, message) => set(produce(draft => {
-        const id = `alert_${Date.now()}`;
-        draft.state.scripting.alerts.push({ id, title, message });
-    })),
-    removeAlert: (id) => set(produce(draft => {
-        draft.state.scripting.alerts = draft.state.scripting.alerts.filter(a => a.id !== id);
-    })),
-}));
+    {
+      name: 'hostingsim-gamestate',
+      storage: createJSONStorage(() => localforage),
+      // This part is crucial for handling non-serializable parts like functions
+      partialize: (state) =>
+        Object.fromEntries(
+          Object.entries(state).filter(([key]) => ![].includes(key))
+        ),
+    }
+  )
+);
 
 export default useGameStore;
 
